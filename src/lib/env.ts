@@ -65,6 +65,8 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema> & {
   isProduction: boolean;
+  /** False when the selected bucket provider is missing credentials; uploads fail, the rest of the app runs. */
+  storageConfigured: boolean;
   isDevelopment: boolean;
   isTest: boolean;
   providers: {
@@ -84,6 +86,14 @@ function resolveProviders(env: z.infer<typeof envSchema>): Env["providers"] {
     stripe: env.STRIPE_SECRET_KEY ? "stripe" : "mock",
     storage: env.STORAGE_PROVIDER,
   };
+}
+
+const STORAGE_CREDENTIAL_KEYS = ["STORAGE_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"] as const;
+
+/** Bucket credentials the configured provider still needs. Empty for local and in-memory storage. */
+export function missingStorageCredentials(env: Pick<z.infer<typeof envSchema>, "STORAGE_PROVIDER" | (typeof STORAGE_CREDENTIAL_KEYS)[number]>): string[] {
+  if (env.STORAGE_PROVIDER !== "railway" && env.STORAGE_PROVIDER !== "s3") return [];
+  return STORAGE_CREDENTIAL_KEYS.filter((key) => !env[key]);
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
@@ -113,17 +123,18 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     }
   }
 
-  if (providers.storage === "railway" || providers.storage === "s3") {
-    const missing = (
-      ["STORAGE_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_ACCESS_KEY_ID", "STORAGE_SECRET_ACCESS_KEY"] as const
-    ).filter((k) => !env[k]);
-    if (missing.length > 0) {
-      throw new Error(`STORAGE_PROVIDER=${providers.storage} requires: ${missing.join(", ")}`);
-    }
+  // Missing bucket credentials do not stop the application from starting: object
+  // storage is only reached when a file is uploaded or served, so the failure
+  // belongs at that call site (see RailwayBucketStorage) rather than at boot.
+  // Everything else - marketing pages, sign-up, quotes, billing - works without it.
+  const missingStorage = missingStorageCredentials(env);
+  if (missingStorage.length > 0 && !isBuildPhase) {
+    console.warn(`[storage] STORAGE_PROVIDER=${providers.storage} is missing ${missingStorage.join(", ")}. File uploads and downloads will fail until these are set.`);
   }
 
   return {
     ...env,
+    storageConfigured: missingStorage.length === 0,
     isProduction,
     isDevelopment: env.NODE_ENV === "development",
     isTest: env.NODE_ENV === "test",

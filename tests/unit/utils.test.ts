@@ -6,7 +6,7 @@ import { safeRedirectPath } from "@/lib/utils/redirect";
 import { hashToken, generateSecureToken, safeEqual } from "@/lib/utils/tokens";
 import { parseMarkdown, isSafeHref } from "@/lib/utils/safe-markdown";
 import { findUnsupportedVariables, substituteVariables, renderEmailHtml } from "@/lib/email/render";
-import { loadEnv } from "@/lib/env";
+import { loadEnv, missingStorageCredentials } from "@/lib/env";
 
 describe("money", () => {
   it("formats minor units per currency", () => {
@@ -86,8 +86,12 @@ describe("environment validation", () => {
   it("refuses to start in production with mock providers", () => {
     expect(() => loadEnv({ ...baseEnv, NODE_ENV: "production", APP_URL: "https://quotecue.example" })).toThrow(/Refusing to start/);
   });
-  it("requires bucket variables for the railway provider", () => {
-    expect(() => loadEnv({ ...baseEnv, NODE_ENV: "development", STORAGE_PROVIDER: "railway" })).toThrow(/STORAGE_BUCKET/);
+  it("reports missing bucket variables without refusing to start", () => {
+    // Missing bucket credentials no longer stop the app from starting; they are
+    // reported through storageConfigured and thrown when storage is actually used.
+    const withoutBucket = loadEnv({ ...baseEnv, NODE_ENV: "development", STORAGE_PROVIDER: "railway" });
+    expect(withoutBucket.storageConfigured).toBe(false);
+    expect(missingStorageCredentials(withoutBucket)).toContain("STORAGE_BUCKET");
   });
 });
 

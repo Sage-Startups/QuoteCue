@@ -7,7 +7,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getEnv } from "@/lib/env";
+import { getEnv, missingStorageCredentials } from "@/lib/env";
 import type { ObjectHead, PresignedUpload, StorageProvider } from "./types";
 
 /**
@@ -22,6 +22,13 @@ export class RailwayBucketStorage implements StorageProvider {
 
   constructor() {
     const env = getEnv();
+    const missing = missingStorageCredentials(env);
+    if (missing.length > 0) {
+      throw new Error(
+        `Object storage is not configured: STORAGE_PROVIDER=${env.STORAGE_PROVIDER} still needs ${missing.join(", ")}. ` +
+          `Set them on the service (values come from your bucket provider) and redeploy; until then uploads and file downloads are unavailable.`,
+      );
+    }
     this.name = env.STORAGE_PROVIDER === "s3" ? "s3" : "railway";
     this.bucket = env.STORAGE_BUCKET!;
     this.client = new S3Client({

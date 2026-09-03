@@ -34,6 +34,8 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 
 ## 6. Map the bucket credentials
 
+The exact variable names differ between bucket providers, so open the bucket service's Variables tab and map whatever it exposes onto the names below. If a `${{...}}` reference does not resolve (wrong service name, or a variable the bucket does not publish) Railway injects an empty value, which reads as missing; pasting the literal values works just as well. Any S3-compatible bucket can be used instead with `STORAGE_PROVIDER=s3` (Cloudflare R2, Backblaze B2, AWS S3) since both providers share one client.
+
 ```
 STORAGE_PROVIDER=railway
 STORAGE_BUCKET=${{Bucket.BUCKET}}
@@ -224,7 +226,7 @@ The cron job `reset-demo-workspace` also rebuilds it every `app.demoResetHours` 
 | `BETTER_AUTH_URL` | no | Overrides the auth base URL (defaults to `APP_URL`) |
 | `SUPER_ADMIN_EMAIL` | no | Promoted by `pnpm db:seed` if the account exists |
 | `STORAGE_PROVIDER` | yes (`railway` or `s3`) | Storage implementation |
-| `STORAGE_BUCKET`, `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | yes | Bucket credentials (mapped from the bucket service) |
+| `STORAGE_BUCKET`, `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | needed for uploads | Bucket credentials (mapped from the bucket service). Missing values no longer stop the app from starting: it logs a warning at boot and only file uploads and downloads fail, so you can deploy first and attach a bucket afterwards |
 | `STORAGE_FORCE_PATH_STYLE` | no (default true) | Path-style S3 addressing |
 | `LOCAL_STORAGE_PATH` | no | Development only |
 | `STRIPE_SECRET_KEY` | yes | Live (or test) secret key |
