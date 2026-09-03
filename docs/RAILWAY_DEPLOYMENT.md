@@ -94,19 +94,15 @@ SUPPORT_EMAIL=support@yourdomain.com
 
 The sending domain must be verified in Resend. See [EMAIL.md](EMAIL.md). Also set `DEMO_MODE=true` if you want the public `/demo` experience (recommended for a sales listing) and optionally `ANALYTICS_ID`.
 
-## 11. Pre-deploy command: migrations
+## 11. Migrations
 
-In the `web` service settings set the **pre-deploy command** to:
+The image applies pending migrations itself before the server starts, so a fresh deployment comes up with a usable schema. Nothing to configure.
 
-```
-./docker/entrypoint.sh migrate
-```
+Prisma takes an advisory lock during `migrate deploy`, so extra replicas wait rather than race, and a run with nothing pending is a no-op. If migrations fail the container exits rather than serving a broken site.
 
-This runs `prisma migrate deploy` with the Prisma CLI bundled in the image before each new deployment receives traffic. Migrations never run automatically at container start, and the database is never seeded by a deploy.
+Where a separate pre-deploy step or a DBA owns schema changes, set `SKIP_MIGRATIONS_ON_START=true` and either set the service's **pre-deploy command** to `./docker/entrypoint.sh migrate` or apply migrations yourself with `railway run pnpm db:deploy`.
 
-Set this before the first deployment serves traffic. Without it the container starts but every page fails with `The table public.SiteSetting does not exist in the current database`, because no migration has ever been applied. To apply them by hand instead, run `railway run pnpm db:deploy` or point `DATABASE_URL` at the database from a local checkout.
-
-If you would rather not use a pre-deploy step, set `RUN_MIGRATIONS_ON_START=true` on the service: the web entrypoint then applies migrations before starting the server. Prisma takes an advisory lock, so extra replicas wait rather than race. The pre-deploy command is still the better option because a failed migration stops the deployment instead of a started container.
+Seeding is never automatic: it writes reference data, so it stays a deliberate act (step 19).
 
 ## 12. Health check
 
@@ -193,11 +189,13 @@ railway run pnpm db:seed                      # from the linked web service, or
 DATABASE_URL="postgresql://..." pnpm db:seed  # from a local checkout
 ```
 
-No local checkout? The image carries a bundled seed, so you can run it as a one-off command on the service instead:
+No local checkout? The image carries a bundled seed. Either run it as a one-off command on the service:
 
 ```
 ./docker/entrypoint.sh seed
 ```
+
+or set `SEED_ON_START=true` on the service and redeploy: the entrypoint seeds once after migrating. The seed is idempotent, so leaving the variable set is harmless, but remove it once the data is in.
 
 With `DEMO_MODE=true` in the environment the seed also creates the Northstar Electrical Services demo workspace (or pass `SEED_DEMO=true` explicitly). Rebuild the demo at any time with:
 
@@ -249,7 +247,8 @@ The cron job `reset-demo-workspace` also rebuilds it every `app.demoResetHours` 
 | `SUPPORT_EMAIL` | no | Seeds the `branding.supportEmail` site setting until an admin sets one in the console; that setting is the support address shown to users and used for contact-form receipts |
 | `DEMO_MODE` | no | Enables `/demo`, the demo seed and the demo reset job |
 | `ANALYTICS_ID` | no | External analytics id referenced by the legal pages |
-| `RUN_MIGRATIONS_ON_START` | no | Applies migrations in the web entrypoint before serving, for deployments without a pre-deploy command |
+| `SKIP_MIGRATIONS_ON_START` | no | Stops the web entrypoint applying migrations, for deployments where a pre-deploy step owns them |
+| `SEED_ON_START` | no | Seeds platform data once after migrating (idempotent); seeding is otherwise never automatic |
 | `ALLOW_MOCK_PROVIDERS` | never in production | Test-suite override of production validation |
 | `SKIP_ENV_VALIDATION` | build only | Set by the Dockerfile during `next build` |
 
