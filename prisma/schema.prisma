@@ -1,0 +1,1355 @@
+// QuoteCue AI - Prisma schema
+// Money is stored in integer minor units (e.g. pence/cents). Quantities use Decimal.
+// Every tenant-owned record carries workspaceId. Timestamps are UTC.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PlatformRole {
+  USER
+  SUPPORT_ADMIN
+  SUPER_ADMIN
+}
+
+enum WorkspaceRole {
+  MEMBER
+  ADMIN
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_DELETION
+}
+
+enum Currency {
+  USD
+  GBP
+  EUR
+  CAD
+  AUD
+  NZD
+}
+
+enum TaxMode {
+  NONE
+  VAT
+  GST
+  SALES_TAX
+  CUSTOM
+}
+
+enum PricingMode {
+  TAX_EXCLUSIVE
+  TAX_INCLUSIVE
+  NO_TAX
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+
+enum ContactMethod {
+  EMAIL
+  PHONE
+  SMS
+  WHATSAPP
+}
+
+enum ServiceUnit {
+  HOUR
+  DAY
+  ITEM
+  METRE
+  SQUARE_METRE
+  VISIT
+  FIXED
+}
+
+enum ItemKind {
+  LABOUR
+  MATERIAL
+  OTHER
+}
+
+enum TaxTreatment {
+  TAXABLE
+  EXEMPT
+}
+
+enum QuoteStatus {
+  DRAFT
+  READY
+  SENT
+  VIEWED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  ARCHIVED
+}
+
+enum DiscountType {
+  NONE
+  FIXED
+  PERCENT
+}
+
+enum QuoteEventType {
+  CREATED
+  UPDATED
+  AI_ANALYSIS
+  AI_GENERATION
+  READY
+  SENT
+  EMAIL_DELIVERED
+  EMAIL_FAILED
+  VIEWED
+  VIEW_REPEAT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REACTIVATED
+  REVISION_CREATED
+  DUPLICATED
+  ARCHIVED
+  RESTORED
+  PDF_GENERATED
+  LINK_COPIED
+  REMINDER_SENT
+  SUPPORT_ACCESS
+  NOTE
+}
+
+enum QuoteActorType {
+  USER
+  CUSTOMER
+  SYSTEM
+  ADMIN
+}
+
+enum MediaKind {
+  IMAGE
+  AUDIO
+  DOCUMENT
+}
+
+enum UploadPurpose {
+  LOGO
+  QUOTE_IMAGE
+  QUOTE_AUDIO
+  QUOTE_DOCUMENT
+  QUOTE_PDF
+  SITE_ASSET
+  EXPORT
+}
+
+enum UploadStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  EXPIRED
+  DELETED
+}
+
+enum EmailKind {
+  WELCOME
+  VERIFY_EMAIL
+  PASSWORD_RESET
+  MAGIC_LINK
+  ACCOUNT_EXISTS
+  TEAM_INVITE
+  QUOTE_SENT
+  QUOTE_VIEWED
+  QUOTE_ACCEPTED
+  QUOTE_DECLINED
+  QUOTE_EXPIRY_REMINDER
+  TRIAL_LIMIT_WARNING
+  SUBSCRIPTION_CONFIRMED
+  PAYMENT_FAILED
+  CONTACT_RECEIPT
+  TEST
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  PREVIEW
+  SKIPPED
+}
+
+enum PlanKind {
+  SUBSCRIPTION
+  CREDIT_PACK
+}
+
+enum PlanKey {
+  FREE
+  STARTER
+  PRO
+  CREDIT_PACK_5
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+  COMPLIMENTARY
+}
+
+enum CreditLedgerType {
+  TRIAL_GRANT
+  PACK_PURCHASE
+  ADMIN_GRANT
+  PROMOTIONAL
+  CONSUMPTION
+  REFUND
+  ADJUSTMENT
+}
+
+enum UsageMetric {
+  AI_GENERATION
+  EMAIL_SENT
+  PDF_GENERATED
+}
+
+enum AiFeature {
+  ENQUIRY_ANALYSIS
+  IMAGE_ANALYSIS
+  TRANSCRIPTION
+  QUOTE_WORDING
+  SECTION_REGENERATE
+  PROMPT_TEST
+}
+
+enum AiRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum AiErrorCategory {
+  NONE
+  TIMEOUT
+  RATE_LIMIT
+  VALIDATION
+  PROVIDER
+  NETWORK
+  CONFIG
+  ENTITLEMENT
+  UNKNOWN
+}
+
+enum JobStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum AcceptanceDecision {
+  ACCEPTED
+  DECLINED
+}
+
+enum ContactStatus {
+  NEW
+  HANDLED
+  SPAM
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // QuoteCue application fields
+  platformRole          PlatformRole @default(USER)
+  suspendedAt           DateTime?
+  suspendedReason       String?
+  onboardingCompletedAt DateTime?
+  lastLoginAt           DateTime?
+  deletedAt             DateTime?
+  locale                String       @default("en-GB")
+
+  sessions            Session[]
+  accounts            Account[]
+  memberships         WorkspaceMember[]
+  ownedWorkspaces     Workspace[]         @relation("WorkspaceOwner")
+  quotesCreated       Quote[]             @relation("QuoteCreatedBy")
+  quoteEvents         QuoteEvent[]
+  uploads             Upload[]
+  aiRuns              AiRun[]
+  auditLogsAsActor    AdminAuditLog[]     @relation("AuditActor")
+  supportSessions     SupportSession[]
+  sentInvites         WorkspaceInvite[]   @relation("InviteSender")
+  applicationEvents   ApplicationEvent[]
+  creditLedgerEntries CreditLedgerEntry[]
+  emailEvents         EmailEvent[]
+  promptVersions      AiPromptVersion[]
+
+  @@index([platformRole])
+  @@index([createdAt])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(uuid()) @db.Uuid
+  issuer                String    @default("")
+  accountId             String
+  providerId            String
+  userId                String    @db.Uuid
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ---------------------------------------------------------------------------
+// Workspaces (tenants)
+// ---------------------------------------------------------------------------
+
+model Workspace {
+  id                  String          @id @default(uuid()) @db.Uuid
+  name                String
+  slug                String          @unique
+  ownerId             String          @db.Uuid
+  owner               User            @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  status              WorkspaceStatus @default(ACTIVE)
+  suspendedReason     String?
+  isDemo              Boolean         @default(false)
+  aiCreditBalance     Int             @default(0)
+  deletionRequestedAt DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  members          WorkspaceMember[]
+  invites          WorkspaceInvite[]
+  settings         BusinessSettings?
+  customers        Customer[]
+  customerTags     CustomerTag[]
+  catalogueItems   ServiceCatalogueItem[]
+  quoteTemplates   QuoteTemplate[]
+  quotes           Quote[]
+  quoteVersions    QuoteVersion[]
+  quoteItems       QuoteItem[]
+  quoteMedia       QuoteMedia[]
+  quoteEvents      QuoteEvent[]
+  quoteAcceptances QuoteAcceptance[]
+  quoteCounters    QuoteCounter[]
+  uploads          Upload[]
+  storedObjects    StoredObject[]
+  emailEvents      EmailEvent[]
+  subscription     Subscription?
+  invoices         BillingInvoice[]
+  creditLedger     CreditLedgerEntry[]
+  usageRecords     UsageRecord[]
+  aiRuns           AiRun[]
+  supportSessions  SupportSession[]
+  appEvents        ApplicationEvent[]
+  storageSnapshots StorageUsageSnapshot[]
+  dailyStats       WorkspaceDailyStat[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([isDemo])
+  @@index([createdAt])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String        @db.Uuid
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceInvite {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @db.Uuid
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        WorkspaceRole @default(MEMBER)
+  tokenHash   String        @unique
+  status      InviteStatus  @default(PENDING)
+  invitedById String        @db.Uuid
+  invitedBy   User          @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([workspaceId, email])
+  @@index([email])
+}
+
+model BusinessSettings {
+  id                String        @id @default(uuid()) @db.Uuid
+  workspaceId       String        @unique @db.Uuid
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  businessName      String
+  tradeSlug         String        @default("general")
+  contactName       String?
+  email             String?
+  phone             String?
+  website           String?
+  addressLine1      String?
+  addressLine2      String?
+  city              String?
+  region            String?
+  postalCode        String?
+  country           String        @default("GB")
+  currency          Currency      @default(GBP)
+  taxMode           TaxMode       @default(VAT)
+  taxLabel          String        @default("VAT")
+  taxRateBps        Int           @default(2000)
+  taxNumber         String?
+  pricingMode       PricingMode   @default(TAX_EXCLUSIVE)
+  labourRateMinor   Int           @default(4500)
+  labourRateUnit    ServiceUnit   @default(HOUR)
+  callOutFeeMinor   Int           @default(0)
+  paymentTerms      String        @default("Payment is due within 14 days of invoice. A deposit may be required before work begins.")
+  depositTerms      String?
+  warrantyWording   String?
+  quoteValidityDays Int           @default(30)
+  quoteNumberPrefix String        @default("QC")
+  quoteFooter       String?
+  logoObjectId      String?       @db.Uuid
+  logoObject        StoredObject? @relation("BusinessLogo", fields: [logoObjectId], references: [id], onDelete: SetNull)
+  brandColor        String        @default("#0f1f3d")
+  accentColor       String        @default("#d97706")
+  defaultTemplateId String?       @db.Uuid
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model QuoteCounter {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  year        Int
+  nextNumber  Int       @default(1)
+
+  @@unique([workspaceId, year])
+}
+
+// ---------------------------------------------------------------------------
+// Customers
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id                     String        @id @default(uuid()) @db.Uuid
+  workspaceId            String        @db.Uuid
+  workspace              Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type                   CustomerType  @default(INDIVIDUAL)
+  contactName            String
+  companyName            String?
+  email                  String?
+  phone                  String?
+  billingAddressLine1    String?
+  billingAddressLine2    String?
+  billingCity            String?
+  billingRegion          String?
+  billingPostalCode      String?
+  billingCountry         String?
+  jobAddressLine1        String?
+  jobAddressLine2        String?
+  jobCity                String?
+  jobRegion              String?
+  jobPostalCode          String?
+  jobCountry             String?
+  internalNotes          String?
+  preferredContactMethod ContactMethod @default(EMAIL)
+  archivedAt             DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  tags   CustomerTagAssignment[]
+  quotes Quote[]
+
+  @@index([workspaceId, archivedAt])
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+  @@index([workspaceId, contactName])
+}
+
+model CustomerTag {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String    @default("#64748b")
+  createdAt   DateTime  @default(now())
+
+  assignments CustomerTagAssignment[]
+
+  @@unique([workspaceId, name])
+}
+
+model CustomerTagAssignment {
+  customerId String      @db.Uuid
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tagId      String      @db.Uuid
+  tag        CustomerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@id([customerId, tagId])
+  @@index([tagId])
+}
+
+// ---------------------------------------------------------------------------
+// Service catalogue and templates
+// ---------------------------------------------------------------------------
+
+model ServiceCatalogueItem {
+  id                  String       @id @default(uuid()) @db.Uuid
+  workspaceId         String       @db.Uuid
+  workspace           Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                String
+  category            String       @default("General")
+  description         String?
+  customerDescription String?
+  unit                ServiceUnit  @default(ITEM)
+  kind                ItemKind     @default(LABOUR)
+  unitPriceMinor      Int          @default(0)
+  internalCostMinor   Int          @default(0)
+  taxTreatment        TaxTreatment @default(TAXABLE)
+  isActive            Boolean      @default(true)
+  archivedAt          DateTime?
+  sortOrder           Int          @default(0)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  quoteItems QuoteItem[]
+
+  @@index([workspaceId, isActive])
+  @@index([workspaceId, category])
+  @@index([workspaceId, name])
+}
+
+model QuoteTemplate {
+  id                       String    @id @default(uuid()) @db.Uuid
+  workspaceId              String    @db.Uuid
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                     String
+  tradeSlug                String?
+  description              String?
+  defaultTitle             String?
+  scopeOfWork              String?
+  includedWork             String?
+  assumptions              String?
+  exclusions               String?
+  customerResponsibilities String?
+  paymentTerms             String?
+  warrantyWording          String?
+  estimatedSchedule        String?
+  customerQuestions        Json?
+  isDefault                Boolean   @default(false)
+  archivedAt               DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  quotes Quote[]
+
+  @@index([workspaceId, archivedAt])
+}
+
+model TradeTemplate {
+  id                 String   @id @default(uuid()) @db.Uuid
+  slug               String   @unique
+  name               String
+  description        String?
+  icon               String?
+  suggestedServices  Json
+  defaultScope       String?
+  commonExclusions   Json
+  commonQuestions    Json
+  defaultTerms       String?
+  defaultAssumptions Json?
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Quotes
+// ---------------------------------------------------------------------------
+
+model Quote {
+  id          String         @id @default(uuid()) @db.Uuid
+  workspaceId String         @db.Uuid
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customerId  String?        @db.Uuid
+  customer    Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  templateId  String?        @db.Uuid
+  template    QuoteTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdById String?        @db.Uuid
+  createdBy   User?          @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  number      String
+  reference   String?
+  status      QuoteStatus    @default(DRAFT)
+  currency    Currency       @default(GBP)
+  title       String         @default("New quote")
+  wizardStep  Int            @default(1)
+
+  jobAddressLine1 String?
+  jobAddressLine2 String?
+  jobCity         String?
+  jobRegion       String?
+  jobPostalCode   String?
+  jobCountry      String?
+
+  // Captured enquiry inputs
+  enquiryText   String?
+  jobNotes      String?
+  transcript    String?
+  internalNotes String?
+  aiAnalysis    Json?
+  aiAnalysisAt  DateTime?
+
+  currentVersionId String?       @unique @db.Uuid
+  currentVersion   QuoteVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  publicTokenHash      String?   @unique
+  publicTokenVersion   Int       @default(1)
+  publicTokenExpiresAt DateTime?
+
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  readyAt        DateTime?
+  sentAt         DateTime?
+  firstViewedAt  DateTime?
+  lastViewedAt   DateTime?
+  viewCount      Int       @default(0)
+  acceptedAt     DateTime?
+  declinedAt     DateTime?
+  expiredAt      DateTime?
+  archivedAt     DateTime?
+  followUpAt     DateTime?
+  reminderSentAt DateTime?
+  lastEmailedAt  DateTime?
+
+  pdfObjectId String?       @db.Uuid
+  pdfObject   StoredObject? @relation("QuotePdf", fields: [pdfObjectId], references: [id], onDelete: SetNull)
+
+  duplicatedFromId String? @db.Uuid
+
+  totalMinor Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  versions    QuoteVersion[]    @relation("QuoteVersions")
+  media       QuoteMedia[]
+  events      QuoteEvent[]
+  acceptances QuoteAcceptance[]
+  emailEvents EmailEvent[]
+  aiRuns      AiRun[]
+
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status])
+  @@index([workspaceId, customerId])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, sentAt])
+  @@index([status, expiresAt])
+}
+
+model QuoteVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  workspaceId   String    @db.Uuid
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quoteId       String    @db.Uuid
+  quote         Quote     @relation("QuoteVersions", fields: [quoteId], references: [id], onDelete: Cascade)
+  versionNumber Int
+
+  title                    String
+  jobSummary               String?
+  scopeOfWork              String?
+  includedWork             String?
+  assumptions              String?
+  exclusions               String?
+  customerResponsibilities String?
+  customerQuestions        Json?
+  paymentTerms             String?
+  estimatedSchedule        String?
+  warrantyWording          String?
+  validityWording          String?
+  followUpEmail            String?
+  depositTerms             String?
+  customerNotes            String?
+
+  pricingMode     PricingMode  @default(TAX_EXCLUSIVE)
+  taxLabel        String       @default("VAT")
+  taxRateBps      Int          @default(0)
+  discountType    DiscountType @default(NONE)
+  discountValue   Int          @default(0)
+  callOutFeeMinor Int          @default(0)
+  callOutFeeLabel String       @default("Call-out fee")
+
+  subtotalMinor     Int @default(0)
+  discountMinor     Int @default(0)
+  taxMinor          Int @default(0)
+  totalMinor        Int @default(0)
+  internalCostMinor Int @default(0)
+
+  isLocked  Boolean   @default(false)
+  lockedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  items       QuoteItem[]
+  acceptances QuoteAcceptance[]
+  currentFor  Quote?            @relation("CurrentVersion")
+
+  @@unique([quoteId, versionNumber])
+  @@index([workspaceId])
+}
+
+model QuoteItem {
+  id                  String                @id @default(uuid()) @db.Uuid
+  workspaceId         String                @db.Uuid
+  workspace           Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versionId           String                @db.Uuid
+  version             QuoteVersion          @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  catalogueItemId     String?               @db.Uuid
+  catalogueItem       ServiceCatalogueItem? @relation(fields: [catalogueItemId], references: [id], onDelete: SetNull)
+  sortOrder           Int                   @default(0)
+  kind                ItemKind              @default(LABOUR)
+  description         String
+  customerDescription String?
+  quantity            Decimal               @default(1) @db.Decimal(12, 3)
+  unit                ServiceUnit           @default(ITEM)
+  unitPriceMinor      Int                   @default(0)
+  discountType        DiscountType          @default(NONE)
+  discountValue       Int                   @default(0)
+  taxTreatment        TaxTreatment          @default(TAXABLE)
+  internalCostMinor   Int                   @default(0)
+  lineSubtotalMinor   Int                   @default(0)
+  lineDiscountMinor   Int                   @default(0)
+  lineTotalMinor      Int                   @default(0)
+  isOptional          Boolean               @default(false)
+  aiSuggested         Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([versionId, sortOrder])
+  @@index([workspaceId])
+}
+
+model QuoteMedia {
+  id             String       @id @default(uuid()) @db.Uuid
+  workspaceId    String       @db.Uuid
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quoteId        String       @db.Uuid
+  quote          Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  storedObjectId String       @db.Uuid
+  storedObject   StoredObject @relation(fields: [storedObjectId], references: [id], onDelete: Cascade)
+  kind           MediaKind
+  caption        String?
+  transcript     String?
+  aiDescription  String?
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([quoteId])
+  @@index([workspaceId])
+}
+
+model QuoteEvent {
+  id          String         @id @default(uuid()) @db.Uuid
+  workspaceId String         @db.Uuid
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quoteId     String         @db.Uuid
+  quote       Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type        QuoteEventType
+  actorType   QuoteActorType @default(SYSTEM)
+  actorUserId String?        @db.Uuid
+  actorUser   User?          @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  message     String?
+  metadata    Json?
+  ipHash      String?
+  createdAt   DateTime       @default(now())
+
+  @@index([quoteId, createdAt])
+  @@index([workspaceId, type, createdAt])
+}
+
+model QuoteAcceptance {
+  id            String             @id @default(uuid()) @db.Uuid
+  workspaceId   String             @db.Uuid
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quoteId       String             @db.Uuid
+  quote         Quote              @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  versionId     String             @db.Uuid
+  version       QuoteVersion       @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  decision      AcceptanceDecision
+  signedName    String?
+  reason        String?
+  termsAccepted Boolean            @default(false)
+  ipHash        String?
+  userAgent     String?
+  totalMinor    Int                @default(0)
+  createdAt     DateTime           @default(now())
+
+  @@index([quoteId])
+  @@index([workspaceId, decision, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------
+
+model Upload {
+  id               String        @id @default(uuid()) @db.Uuid
+  workspaceId      String?       @db.Uuid
+  workspace        Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId           String?       @db.Uuid
+  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  purpose          UploadPurpose
+  status           UploadStatus  @default(PENDING)
+  objectKey        String        @unique
+  originalFilename String
+  mimeType         String
+  expectedBytes    Int
+  actualBytes      Int?
+  quoteId          String?       @db.Uuid
+  storedObjectId   String?       @unique @db.Uuid
+  storedObject     StoredObject? @relation(fields: [storedObjectId], references: [id], onDelete: SetNull)
+  error            String?
+  expiresAt        DateTime
+  completedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([workspaceId])
+}
+
+model StoredObject {
+  id               String        @id @default(uuid()) @db.Uuid
+  workspaceId      String?       @db.Uuid
+  workspace        Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  key              String        @unique
+  bucket           String
+  purpose          UploadPurpose
+  mimeType         String
+  sizeBytes        Int
+  originalFilename String?
+  width            Int?
+  height           Int?
+  durationSeconds  Int?
+  checksum         String?
+  retainUntil      DateTime?
+  createdAt        DateTime      @default(now())
+  deletedAt        DateTime?
+
+  upload     Upload?
+  quoteMedia QuoteMedia[]
+  logoFor    BusinessSettings[] @relation("BusinessLogo")
+  pdfFor     Quote[]            @relation("QuotePdf")
+
+  @@index([workspaceId, purpose])
+  @@index([deletedAt])
+}
+
+model StorageUsageSnapshot {
+  id          String     @id @default(uuid()) @db.Uuid
+  workspaceId String?    @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  totalBytes  BigInt
+  objectCount Int
+  recordedAt  DateTime   @default(now())
+
+  @@index([workspaceId, recordedAt])
+  @@index([recordedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Email
+// ---------------------------------------------------------------------------
+
+model EmailTemplate {
+  id           String    @id @default(uuid()) @db.Uuid
+  kind         EmailKind @unique
+  name         String
+  subject      String
+  previewText  String?
+  bodyMarkdown String
+  variables    Json
+  enabled      Boolean   @default(true)
+  updatedById  String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model EmailEvent {
+  id                String      @id @default(uuid()) @db.Uuid
+  workspaceId       String?     @db.Uuid
+  workspace         Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  userId            String?     @db.Uuid
+  user              User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  quoteId           String?     @db.Uuid
+  quote             Quote?      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  kind              EmailKind
+  toEmail           String
+  subject           String
+  status            EmailStatus
+  provider          String
+  providerMessageId String?
+  error             String?
+  htmlPreview       String?
+  textPreview       String?
+  metadata          Json?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([workspaceId, createdAt])
+  @@index([kind, createdAt])
+  @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+model Plan {
+  id                     String   @id @default(uuid()) @db.Uuid
+  key                    PlanKey  @unique
+  kind                   PlanKind @default(SUBSCRIPTION)
+  name                   String
+  description            String?
+  monthlyPriceMinor      Int      @default(0)
+  annualPriceMinor       Int      @default(0)
+  oneTimePriceMinor      Int      @default(0)
+  currency               Currency @default(USD)
+  aiGenerationsPerPeriod Int      @default(0)
+  creditsGranted         Int      @default(0)
+  maxMembers             Int      @default(1)
+  storageAllowanceMb     Int      @default(500)
+  stripeMonthlyPriceId   String?
+  stripeAnnualPriceId    String?
+  stripeOneTimePriceId   String?
+  isActive               Boolean  @default(true)
+  isPublic               Boolean  @default(true)
+  highlight              Boolean  @default(false)
+  sortOrder              Int      @default(0)
+  featureBullets         Json
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  entitlements  PlanEntitlement[]
+  subscriptions Subscription[]
+}
+
+model PlanEntitlement {
+  id      String  @id @default(uuid()) @db.Uuid
+  planId  String  @db.Uuid
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  key     String
+  enabled Boolean @default(true)
+  value   Json?
+
+  @@unique([planId, key])
+}
+
+model Subscription {
+  id                        String             @id @default(uuid()) @db.Uuid
+  workspaceId               String             @unique @db.Uuid
+  workspace                 Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  planId                    String             @db.Uuid
+  plan                      Plan               @relation(fields: [planId], references: [id])
+  status                    SubscriptionStatus @default(TRIALING)
+  interval                  BillingInterval    @default(MONTH)
+  stripeCustomerId          String?            @unique
+  stripeSubscriptionId      String?            @unique
+  stripePriceId             String?
+  currentPeriodStart        DateTime
+  currentPeriodEnd          DateTime
+  cancelAtPeriodEnd         Boolean            @default(false)
+  canceledAt                DateTime?
+  trialEndsAt               DateTime?
+  complimentaryUntil        DateTime?
+  complimentaryReason       String?
+  lastPaymentFailureAt      DateTime?
+  lastPaymentFailureMessage String?
+  lastSyncedAt              DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  @@index([status])
+  @@index([planId])
+}
+
+model BillingInvoice {
+  id               String    @id @default(uuid()) @db.Uuid
+  workspaceId      String    @db.Uuid
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stripeInvoiceId  String    @unique
+  number           String?
+  status           String
+  amountDueMinor   Int
+  amountPaidMinor  Int
+  currency         String
+  hostedInvoiceUrl String?
+  invoicePdfUrl    String?
+  description      String?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([workspaceId, createdAt])
+}
+
+model CreditLedgerEntry {
+  id             String           @id @default(uuid()) @db.Uuid
+  workspaceId    String           @db.Uuid
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId         String?          @db.Uuid
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type           CreditLedgerType
+  delta          Int
+  balanceAfter   Int
+  idempotencyKey String?          @unique
+  reason         String?
+  aiRunId        String?          @db.Uuid
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+
+  @@index([workspaceId, createdAt])
+}
+
+model UsageRecord {
+  id          String      @id @default(uuid()) @db.Uuid
+  workspaceId String      @db.Uuid
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  metric      UsageMetric
+  periodStart DateTime
+  periodEnd   DateTime
+  count       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([workspaceId, metric, periodStart])
+}
+
+model StripeWebhookEvent {
+  id             String        @id @default(uuid()) @db.Uuid
+  stripeEventId  String        @unique
+  type           String
+  status         WebhookStatus @default(RECEIVED)
+  apiVersion     String?
+  livemode       Boolean       @default(false)
+  payloadSummary Json?
+  error          String?
+  processedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([type, createdAt])
+  @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+model AiPromptVersion {
+  id           String    @id @default(uuid()) @db.Uuid
+  feature      AiFeature
+  version      Int
+  systemPrompt String
+  userTemplate String
+  model        String?
+  notes        String?
+  isPublished  Boolean   @default(false)
+  publishedAt  DateTime?
+  createdById  String?   @db.Uuid
+  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  runs AiRun[]
+
+  @@unique([feature, version])
+  @@index([feature, isPublished])
+}
+
+model AiRun {
+  id                  String           @id @default(uuid()) @db.Uuid
+  workspaceId         String?          @db.Uuid
+  workspace           Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  userId              String?          @db.Uuid
+  user                User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  quoteId             String?          @db.Uuid
+  quote               Quote?           @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  feature             AiFeature
+  provider            String
+  model               String
+  promptVersionId     String?          @db.Uuid
+  promptVersion       AiPromptVersion? @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  promptVersionNo     Int?
+  status              AiRunStatus      @default(RUNNING)
+  errorCategory       AiErrorCategory  @default(NONE)
+  errorMessage        String?
+  inputTokens         Int              @default(0)
+  outputTokens        Int              @default(0)
+  audioSeconds        Int              @default(0)
+  estimatedCostMicros Int              @default(0)
+  creditConsumed      Boolean          @default(false)
+  idempotencyKey      String?          @unique
+  startedAt           DateTime         @default(now())
+  completedAt         DateTime?
+  durationMs          Int?
+  metadata            Json?
+
+  @@index([workspaceId, startedAt])
+  @@index([feature, status, startedAt])
+  @@index([startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Platform configuration and administration
+// ---------------------------------------------------------------------------
+
+model SiteSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       Json
+  description String?
+  updatedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MarketingContent {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       Json
+  updatedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  enabled     Boolean  @default(true)
+  updatedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminAuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  actorUserId   String?  @db.Uuid
+  actor         User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorEmail    String?
+  action        String
+  targetType    String
+  targetId      String?
+  reason        String?
+  previousValue Json?
+  newValue      Json?
+  ipHash        String?
+  createdAt     DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+model SupportSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  adminUserId String    @db.Uuid
+  admin       User      @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  workspaceId String    @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  reason      String
+  startedAt   DateTime  @default(now())
+  expiresAt   DateTime
+  endedAt     DateTime?
+
+  @@index([adminUserId, endedAt])
+  @@index([workspaceId])
+}
+
+model BackgroundJobRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  runId      String
+  jobName    String
+  status     JobStatus @default(RUNNING)
+  host       String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+  result     Json?
+  error      String?
+
+  @@index([jobName, startedAt])
+  @@index([runId])
+  @@index([status, startedAt])
+}
+
+model ApplicationEvent {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String
+  userId      String?    @db.Uuid
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workspaceId String?    @db.Uuid
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  properties  Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([name, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([createdAt])
+}
+
+model ApplicationError {
+  id        String   @id @default(uuid()) @db.Uuid
+  scope     String
+  message   String
+  stack     String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model ContactSubmission {
+  id        String        @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  company   String?
+  message   String
+  status    ContactStatus @default(NEW)
+  ipHash    String?
+  handledAt DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([status, createdAt])
+}
+
+model WorkspaceDailyStat {
+  id                 String    @id @default(uuid()) @db.Uuid
+  workspaceId        String    @db.Uuid
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  day                DateTime  @db.Date
+  quotesCreated      Int       @default(0)
+  quotesSent         Int       @default(0)
+  quotesViewed       Int       @default(0)
+  quotesAccepted     Int       @default(0)
+  quotesDeclined     Int       @default(0)
+  valueQuotedMinor   Int       @default(0)
+  valueAcceptedMinor Int       @default(0)
+  aiGenerations      Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([workspaceId, day])
+}
+
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}
