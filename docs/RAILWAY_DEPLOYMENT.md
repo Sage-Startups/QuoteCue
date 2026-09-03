@@ -104,6 +104,8 @@ In the `web` service settings set the **pre-deploy command** to:
 
 This runs `prisma migrate deploy` with the Prisma CLI bundled in the image before each new deployment receives traffic. Migrations never run automatically at container start, and the database is never seeded by a deploy.
 
+Set this before the first deployment serves traffic. Without it the container starts but every page fails with `The table public.SiteSetting does not exist in the current database`, because no migration has ever been applied. To apply them by hand instead, run `railway run pnpm db:deploy` or point `DATABASE_URL` at the database from a local checkout.
+
 ## 12. Health check
 
 Set the service **health check path** to `/api/health`. The route answers `{"status":"ok","database":"ok",...}` with 200 when the database round trip succeeds and 503 otherwise; Railway waits for it before switching traffic. (The Dockerfile's own `HEALTHCHECK` targets the same route.)
