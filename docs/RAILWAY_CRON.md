@@ -12,6 +12,18 @@ QuoteCue AI has no in-process queue. Everything that must happen later is an ide
 
 Railway's `RAILWAY_SERVICE_NAME` is recorded by the heartbeat job so you can see which service produced a run.
 
+## Verifying the runner
+
+The cron service runs `dist/jobs/run.js`, an esbuild bundle rather than the TypeScript the tests import, so check the bundle itself after changing the build:
+
+```bash
+pnpm jobs:build
+node dist/jobs/run.js --list     # loads the whole module graph, touches no database
+```
+
+`tests/unit/jobs-bundle.test.ts` runs that check on every `pnpm test`. It exists because the bundle once loaded `import.meta.url` as undefined under CommonJS, which made the generated Prisma client throw on load and every cron run crash while all source-level tests passed.
+
+
 ## Locking and overlapping runs
 
 `runAllJobs` takes the PostgreSQL session advisory lock `pg_try_advisory_lock(7420261)` before running anything and releases it in a `finally` block. If the lock is already held (a previous run is still going, or someone started `pnpm jobs:run` by hand), the runner writes a `BackgroundJobRun` row with `jobName = "runner"`, status `SKIPPED` and the error "Another runner holds the advisory lock", logs a warning and exits **0**. Jobs therefore never execute concurrently, and a slow job simply delays the next schedule rather than doubling up.
