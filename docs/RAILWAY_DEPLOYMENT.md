@@ -234,7 +234,7 @@ The cron job `reset-demo-workspace` also rebuilds it every `app.demoResetHours` 
 | `OPENAI_TEXT_MODEL`, `OPENAI_VISION_MODEL`, `OPENAI_TRANSCRIBE_MODEL` | no | Model defaults (`gpt-5.4-mini`, `gpt-5.4-mini`, `gpt-4o-mini-transcribe`) |
 | `RESEND_API_KEY` | yes | Resend key |
 | `EMAIL_FROM` | yes in practice | Sender on a verified domain (default is `noreply@example.com`, which Resend will reject) |
-| `SUPPORT_EMAIL` | no | Validated but not read anywhere at runtime; the support address shown to users and used for contact-form receipts is the `branding.supportEmail` site setting |
+| `SUPPORT_EMAIL` | no | Seeds the `branding.supportEmail` site setting until an admin sets one in the console; that setting is the support address shown to users and used for contact-form receipts |
 | `DEMO_MODE` | no | Enables `/demo`, the demo seed and the demo reset job |
 | `ANALYTICS_ID` | no | External analytics id referenced by the legal pages |
 | `ALLOW_MOCK_PROVIDERS` | never in production | Test-suite override of production validation |
