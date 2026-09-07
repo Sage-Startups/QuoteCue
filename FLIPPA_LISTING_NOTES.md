@@ -122,6 +122,8 @@ Not included: a domain (the seller's domain may be transferred by agreement), St
 
 ## Recommended screenshots
 
+- Demo video for the listing: `docs/media/quotecue-demo.mp4` (59 s, 1920x1080, H.264, silent) with a poster frame `docs/media/quotecue-demo-poster.jpg`. Recorded from the live application on the seeded demo workspace; the super-admin scene includes demonstration data and says so on screen.
+
 `docs/screenshots/` currently holds only `landing-desktop.png`; capture the rest before listing (a Playwright suite writing to that directory is outlined in `docs/TESTING.md`). Use the seeded demo and a development account with the mock providers.
 
 | File | What to capture |

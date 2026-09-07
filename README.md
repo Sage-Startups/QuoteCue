@@ -2,6 +2,8 @@
 
 **From enquiry to professional quote in minutes.**
 
+A one-minute product demo video is at `docs/media/quotecue-demo.mp4` (1080p, H.264), with a poster frame at `docs/media/quotecue-demo-poster.jpg`. It was recorded from the running application against the seeded demo workspace.
+
 QuoteCue AI is a multi-tenant SaaS application for tradespeople (electricians, plumbers, builders, heating engineers and similar trades). It turns the messy inputs a tradesperson already receives — a customer's text message, a voice note recorded on site and a handful of job photos — into a priced, branded, professional quote that the customer can accept online.
 
 This repository contains the complete application: marketing site, customer-facing quote pages, the authenticated app, a super-admin console, a background job runner and everything needed to deploy on Railway.
