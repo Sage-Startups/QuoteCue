@@ -80,16 +80,16 @@ Open <http://localhost:3000>.
 
 ### First account
 
-1. Go to `/signup`, register with a name, email and a password of at least 10 characters.
-2. Registration requires email verification. With no `RESEND_API_KEY` the verification email is not delivered; sign in is blocked until verified, so open the preview inbox instead. The preview inbox lives at `/app/dev/emails` and requires a workspace, so the simplest route for a *first* user is to read the verification link straight from the database:
+1. Go to `/signup`, register with a name, email and a password of at least 10 characters, and choose a plan. The free plan is preselected unless the link carried one (the pricing page links here as `/signup?plan=pro&interval=annual`).
+2. There is no email verification step: the account is created, signed in and sent to `/onboarding`. A welcome email is sent at this point; with no `RESEND_API_KEY` it is stored as a preview rather than delivered, which does not affect sign-in.
+3. Complete onboarding (business name, trade, currency, tax, labour rate). This creates the workspace, business settings, a default template, the starter catalogue and the trial credits.
+4. Where you land depends on the plan chosen in step 1: the free plan goes to the dashboard, and a paid plan goes to Stripe Checkout, or to the mock checkout page when no `STRIPE_SECRET_KEY` is set. If the checkout cannot be created you land on `/app/billing?checkout=unavailable` instead, with the trial already active.
+
+   The preview inbox at `/app/dev/emails` needs a workspace, so anything sent before onboarding finishes has to be read from the database:
 
    ```sql
    SELECT "toEmail", "subject", "textPreview" FROM "EmailEvent" ORDER BY "createdAt" DESC LIMIT 1;
    ```
-
-   (Alternatively set a real `RESEND_API_KEY` from the start.)
-3. Follow the verification link; you are signed in automatically and redirected to `/onboarding`.
-4. Complete onboarding (business name, trade, currency, tax, labour rate). This creates the workspace, business settings, a default template, the starter catalogue and the trial credits.
 
 ### Demo workspace
 
@@ -173,6 +173,6 @@ Remember that production mode refuses mock providers; supply real keys or run wi
 | `Invalid environment configuration: BETTER_AUTH_SECRET must be at least 32 characters` | Generate a longer secret |
 | `Refusing to start in production: ...` | `NODE_ENV=production` with missing keys or local storage; use development locally |
 | `STORAGE_PROVIDER=railway requires: STORAGE_BUCKET, ...` | Map all five bucket variables, or use `local` in development |
-| Sign-in says "Please verify your email address first" | Read the verification link from the preview inbox or `EmailEvent` |
+| Sign-in is refused for an account created before verification was removed | `./docker/entrypoint.sh ops verify-email you@example.com` (or set `emailVerified` on the row); new accounts are created verified |
 | Prisma client errors after pulling changes | `pnpm prisma:generate` and `pnpm db:migrate` |
 | Uploads fail in development | Check `.local-storage` is writable and `APP_URL` matches the browser origin (signed local URLs include the origin) |

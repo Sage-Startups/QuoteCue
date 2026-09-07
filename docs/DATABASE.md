@@ -25,7 +25,7 @@ PostgreSQL 16 accessed through Prisma 7 with the `@prisma/adapter-pg` driver ada
 | `User` | Identity plus application fields: `platformRole` (`USER`, `SUPPORT_ADMIN`, `SUPER_ADMIN`), `suspendedAt`, `onboardingCompletedAt`, `lastLoginAt`, `deletedAt`, `locale` |
 | `Session` | Database-backed sessions (token, expiry, IP, user agent) |
 | `Account` | Credential provider record (hashed password) |
-| `Verification` | Email verification, password reset and magic-link tokens |
+| `Verification` | Better Auth token store: password reset and magic-link tokens (no email-verification tokens are issued) |
 
 ### Workspaces (tenants)
 

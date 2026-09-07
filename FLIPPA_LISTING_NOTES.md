@@ -39,6 +39,7 @@ Prices, allowances and entitlements live in the database and Stripe and can be c
 - Status lifecycle Draft → Ready → Sent → Viewed → Accepted / Declined / Expired → Archived, enforced by a state machine; automatic expiry and expiry-reminder emails.
 
 **Workspace and CRM**
+- Sign-up (name, email, password, plan) signs the person in immediately, with no email verification step, and continues into onboarding; a paid plan continues to Stripe Checkout once the workspace exists.
 - Onboarding creates business settings, a default quote template, a trade-specific starter catalogue and a sample quote.
 - Customers (individuals or companies) with tags, billing and job addresses, preferred contact method, notes and quote history.
 - Service catalogue with categories, units, prices, internal costs, tax treatment, CSV import and export.
@@ -142,7 +143,7 @@ Follow `docs/DEMO_SCRIPT.md` (about ten minutes):
 
 1. Landing page and positioning.
 2. `/demo` dashboard, interactive quote builder (enquiry → analysis → pricing → preview), quotes list, customer view, reset.
-3. Real app: sign-up and verification, onboarding with a trade template, catalogue.
+3. Real app: sign-up with a plan choice, onboarding with a trade template, catalogue.
 4. Seven-step wizard on a quote with mock AI: capture, analysis, pricing, wording (with section regeneration), review, send.
 5. Customer link: view, PDF, accept; owner notifications and timeline.
 6. Analytics, billing with mock checkout and plan change, team invitation.

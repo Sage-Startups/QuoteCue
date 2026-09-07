@@ -1,7 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,9 +50,8 @@ const CURRENCY_DEFAULTS: Record<string, { taxMode: string; country: string }> = 
 };
 
 export function OnboardingForm(props: Props) {
-  const router = useRouter();
   const [step, setStep] = useState(0);
-  const [state, action, pending] = useActionState(async (prev: ActionResult<{ redirectTo: string }> | null, fd: FormData) => {
+  const [state, action, pending] = useActionState(async (prev: ActionResult | null, fd: FormData) => {
     const result = await completeOnboardingAction(prev, fd);
     if (!result.ok && result.fieldErrors) {
       const fields = Object.keys(result.fieldErrors);
@@ -71,12 +69,7 @@ export function OnboardingForm(props: Props) {
   const [labourUnit, setLabourUnit] = useState("HOUR");
   const err = (field: string) => (state && !state.ok ? state.fieldErrors?.[field] : undefined);
 
-  useEffect(() => {
-    if (state?.ok) {
-      router.push(state.data.redirectTo);
-      router.refresh();
-    }
-  }, [state, router]);
+
 
   const progress = useMemo(() => Math.round(((step + 1) / STEPS.length) * 100), [step]);
 

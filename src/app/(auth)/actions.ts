@@ -1,7 +1,7 @@
 "use server";
 
 import { APIError } from "better-auth/api";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
@@ -16,10 +16,10 @@ import { trackEvent } from "@/lib/services/app-events";
 import { getClientIp } from "@/lib/utils/request";
 import { safeRedirectPath } from "@/lib/utils/redirect";
 import { normaliseEmail } from "@/lib/utils/strings";
+import { PENDING_PLAN_COOKIE } from "@/lib/billing/pending-plan";
 import { fail, ok, type ActionResult } from "@/lib/utils/result";
 import { zodFieldErrors } from "@/lib/utils/zod-form";
 
-const GENERIC_SIGNUP_MESSAGE = "Thanks! If this email address can be registered, we have sent a verification link. Check your inbox and spam folder.";
 const GENERIC_RESET_MESSAGE = "If an account exists for that email address, a password reset link is on its way.";
 const GENERIC_MAGIC_MESSAGE = "If an account exists for that email address, a sign-in link is on its way.";
 
@@ -28,6 +28,8 @@ const signupSchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
   password: z.string().min(10, "Use at least 10 characters").max(128),
   terms: z.literal("on", { error: "Please accept the terms to continue" }),
+  plan: z.enum(["FREE", "STARTER", "PRO"]).default("FREE"),
+  interval: z.enum(["monthly", "annual"]).default("monthly"),
 });
 
 export async function signUpAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
@@ -41,30 +43,40 @@ export async function signUpAction(_prev: ActionResult | null, formData: FormDat
   const email = normaliseEmail(parsed.data.email);
   await trackEvent({ name: "registration_started" });
   try {
-    const result = await auth.api.signUpEmail({ body: { name: parsed.data.name, email, password: parsed.data.password, callbackURL: "/app" }, headers: await headers() });
+    const result = await auth.api.signUpEmail({ body: { name: parsed.data.name, email, password: parsed.data.password }, headers: await headers() });
     await trackEvent({ name: "registration_completed", userId: result.user.id });
-    // Telling someone to check an inbox nothing was sent to leaves them stuck
-    // with no way to sign in, so report an undelivered verification honestly.
-    const delivered = await prisma.emailEvent.findFirst({
-      where: { toEmail: email, kind: "VERIFY_EMAIL" },
-      orderBy: { createdAt: "desc" },
-      select: { status: true },
-    });
-    if (delivered && delivered.status !== "SENT") {
-      return ok(undefined, "Your account was created, but we could not send the verification email, so it is not active yet. Please contact support and we will confirm it for you.");
+    // The workspace does not exist until onboarding finishes, and a subscription
+    // belongs to a workspace, so carry the chosen plan until then.
+    if (parsed.data.plan !== "FREE") {
+      const cookieStore = await cookies();
+      cookieStore.set(PENDING_PLAN_COOKIE, `${parsed.data.plan}:${parsed.data.interval}`, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: getEnv().isProduction,
+        maxAge: 60 * 60 * 24,
+      });
     }
-    return ok(undefined, GENERIC_SIGNUP_MESSAGE);
+    const env = getEnv();
+    await sendEmail({
+      kind: "WELCOME",
+      to: email,
+      userId: result.user.id,
+      variables: { name: parsed.data.name, dashboardUrl: `${env.APP_URL}/app` },
+    }).catch((error: unknown) => console.error("[auth] welcome email failed", error));
   } catch (error) {
-    if (error instanceof APIError && (error.body?.code === "USER_ALREADY_EXISTS" || error.status === 422)) {
-      // Prevent enumeration: tell the existing account holder by email instead of on screen.
-      const env = getEnv();
-      await sendEmail({ kind: "ACCOUNT_EXISTS", to: email, variables: { loginUrl: `${env.APP_URL}/login`, resetUrl: `${env.APP_URL}/forgot-password` } });
-      return ok(undefined, GENERIC_SIGNUP_MESSAGE);
+    // Better Auth reports this as status "UNPROCESSABLE_ENTITY" with the code
+    // USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL, so match the prefix rather than an
+    // exact code: a stricter check fell through to the generic failure message.
+    if (error instanceof APIError && (error.body?.code?.startsWith("USER_ALREADY_EXISTS") || error.status === "UNPROCESSABLE_ENTITY" || error.status === 422)) {
+      return fail("An account already exists for that email address. Sign in instead, or reset your password.", { email: ["This email address is already registered"] });
     }
     if (error instanceof APIError && error.body?.code === "PASSWORD_TOO_SHORT") return fail("Please use a longer password.", { password: ["Use at least 10 characters"] });
     console.error("[auth] sign-up failed", error);
     return fail("We could not create your account right now. Please try again.");
   }
+  // Outside the try: redirect() throws by design and must not be caught above.
+  redirect("/onboarding");
 }
 
 const loginSchema = z.object({
@@ -138,24 +150,6 @@ export async function resetPasswordAction(_prev: ActionResult | null, formData: 
     console.error("[auth] password reset failed", error);
     return fail("We could not reset your password right now. Please try again.");
   }
-}
-
-export async function resendVerificationAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const parsed = emailOnlySchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return fail("Please fix the highlighted fields.", zodFieldErrors(parsed.error));
-  const ip = await getClientIp();
-  const limit = await checkRateLimit("passwordReset", `verify:${ip ?? "unknown"}`);
-  if (!limit.allowed) return fail("Too many requests. Please try again later.");
-  const email = normaliseEmail(parsed.data.email);
-  const user = await prisma.user.findUnique({ where: { email }, select: { emailVerified: true } });
-  if (user && !user.emailVerified) {
-    try {
-      await auth.api.sendVerificationEmail({ body: { email, callbackURL: "/app" }, headers: await headers() });
-    } catch (error) {
-      console.error("[auth] resend verification failed", error);
-    }
-  }
-  return ok(undefined, "If that address needs verifying, a new link is on its way.");
 }
 
 export async function magicLinkAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {

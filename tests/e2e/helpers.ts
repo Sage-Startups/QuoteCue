@@ -34,8 +34,8 @@ export async function latestEmailLink(toEmail: string, kind: string, pathPrefix:
 
 export const PASSWORD = "Str0ng-Passw0rd-e2e!";
 
-/** Registers, verifies (via preview email) and signs in a brand-new user. Returns the email. */
-export async function registerAndVerify(page: Page, name = "Test Trader"): Promise<string> {
+/** Registers a brand-new user and lands in the app. Returns the email. */
+export async function registerAndVerify(page: Page, name = "Test Trader", plan?: "STARTER" | "PRO"): Promise<string> {
   const email = uniqueEmail();
   // Every project (desktop/tablet/mobile) registers fresh users from the same
   // loopback IP, which would trip the production registration limit.  Reset the
@@ -45,12 +45,11 @@ export async function registerAndVerify(page: Page, name = "Test Trader"): Promi
   await page.getByLabel("Your name").fill(name);
   await page.getByLabel("Email").fill(email);
   await page.locator("#password").fill(PASSWORD);
+  if (plan) await page.getByRole("radio", { name: new RegExp(plan, "i") }).check();
   await page.getByLabel(/I agree to the/).check();
   await page.getByRole("button", { name: "Create my account" }).click();
-  await expect(page.getByText("Check your email")).toBeVisible();
-  const link = await latestEmailLink(email, "VERIFY_EMAIL", "/api/auth/verify-email");
-  await page.goto(link);
-  await page.waitForURL(/\/(app|onboarding|login)/);
+  // No verification step: sign-up signs in and goes straight to onboarding.
+  await page.waitForURL(/\/(onboarding|app)/);
   return email;
 }
 

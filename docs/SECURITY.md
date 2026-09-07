@@ -9,7 +9,7 @@ QuoteCue AI is a multi-tenant SaaS holding tradespeople's customer details, job 
 | Threat | Primary controls |
 | --- | --- |
 | Cross-tenant data access (one workspace reading another's data) | Every service takes a `workspaceId` and scopes each query by it; the workspace cookie is re-validated against membership on every request; files require membership; presigned URLs are short-lived |
-| Account takeover (credential stuffing, enumeration, session theft) | Email verification, 10–128 character passwords, database sessions with 7-day expiry, rate limits per IP/email, neutral responses, sessions revoked on password reset, suspension hook, secure cookies |
+| Account takeover (credential stuffing, enumeration, session theft) | 10–128 character passwords, database sessions with 7-day expiry, rate limits per IP/email, neutral responses on the reset and magic-link flows, sessions revoked on password reset, suspension hook, secure cookies |
 | Forged or replayed billing events | Stripe signature verification on the raw body, idempotent `StripeWebhookEvent` processing, subscription state only ever written from Stripe data |
 | Guessable or leaked customer quote links | 256-bit HMAC-derived tokens, only SHA-256 hashes stored, expiry, rotation, workspace/status checks, rate limiting |
 | Malicious uploads (oversized files, wrong types, path traversal, EXIF/GPS leakage) | Policy validation before presign, size re-check on finalise, random keys, `sharp` re-encoding that strips metadata, MIME/extension agreement |
@@ -26,11 +26,12 @@ Out of scope: denial of service at the network level (Railway's edge), compromis
 ### Authentication and sessions (`src/lib/auth/*`, `src/app/(auth)/actions.ts`)
 
 - Better Auth with the Prisma adapter; passwords are hashed by Better Auth's default scheme (scrypt); the hash lives in `Account`, never on `User`.
-- Email verification is required before sign-in; verification links expire after 1 hour, password-reset links after 1 hour, magic links after 10 minutes, and magic links cannot create accounts.
+- Email addresses are not verified. Sign-up creates the account with `emailVerified: true` (a `user.create.before` hook), signs the person in and sends them to onboarding; an undelivered email therefore cannot lock anyone out of a new account. Password-reset links expire after 1 hour, magic links after 10 minutes, and magic links cannot create accounts, so possession of the address is still proved before a password can be changed.
 - Sessions are database rows: 7-day expiry, refreshed daily, `quotecue`-prefixed cookies, `secure` in production. Users can list and revoke their other sessions; admins can revoke all sessions; password reset revokes every session.
 - A `session.create.before` hook refuses suspended or deleted users even with valid credentials.
 - `trustedOrigins` is `[APP_URL]`, so cross-origin requests to the auth API are rejected.
-- Enumeration safety: sign-up with an existing address returns the normal success message and emails the existing owner (`ACCOUNT_EXISTS`); reset, magic-link and resend-verification always return the same message; login errors never say which part was wrong.
+- Enumeration safety: password reset and magic link always return the same message whether or not the address is registered, and login errors never say which part was wrong.
+- **Accepted trade-off:** sign-up does tell the visitor that an address is already registered ("An account already exists for that email address..."). Because sign-up now signs the person in and continues to onboarding, the former silent success would have been a dead end for someone who simply forgot they had an account. The result is that `/signup` can be used to test whether an address holds an account, at 5 attempts per 10 minutes per IP (`registration` rate limit). If that matters more than the dead end, restore the neutral message in `signUpAction` and reinstate the `ACCOUNT_EXISTS` email, whose template still exists.
 - `safeRedirectPath` allows only same-origin relative paths for `?next=`.
 
 ### Authorisation (`src/lib/auth/session.ts`)
@@ -105,7 +106,7 @@ Applied to every non-static response:
 - Raw IP addresses: `hashIp` stores a truncated salted hash on quote events, acceptances, contact submissions and audit rows.
 - Photo metadata (EXIF, GPS, device details): stripped on upload.
 - One workspace's data to another workspace's members, or unclaimed onboarding uploads to anyone but the uploader.
-- Whether an email address is registered (sign-up, reset, magic-link and verification flows answer identically).
+- Whether an email address is registered, on the reset and magic-link flows (they answer identically). Sign-up is the documented exception above.
 - Enquiry text, quote wording or other content in `ApplicationEvent` properties (identifiers and numbers only).
 - Internal cost and margin figures to customers: the public document model (`buildQuoteDocument`) is customer-safe and is the only source for the public page and PDF.
 - Stack traces or internal error messages to end users in production.
@@ -118,7 +119,7 @@ Fixed-window limits stored in `RateLimitBucket` (`src/lib/security/rate-limit.ts
 | --- | --- | --- | --- | --- |
 | `registration` | 5 | 10 min | IP | `signUpAction` |
 | `login` | 10 | 10 min | IP + email | `signInAction` |
-| `passwordReset` | 5 | 15 min | IP (`verify:` prefix for resend-verification) | forgot password, resend verification |
+| `passwordReset` | 5 | 15 min | IP | forgot password |
 | `magicLink` | 5 | 15 min | IP | magic-link request |
 | `aiGeneration` | 20 | 10 min | workspace | transcription, analysis, wording, section regeneration |
 | `publicQuote` | 60 | 5 min | IP | `/q/[token]` page and PDF |

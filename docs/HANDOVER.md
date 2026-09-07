@@ -89,14 +89,14 @@ aws s3 sync ./bucket-backup "s3://<NEW_BUCKET>" --endpoint-url "<NEW_ENDPOINT>" 
 
 ## 8. Changing prices and plans
 
-- Prices displayed come from `Plan` (`monthlyPriceMinor`, `annualPriceMinor`, `oneTimePriceMinor`, `featureBullets`, `aiGenerationsPerPeriod`, `maxMembers`); prices charged come from Stripe. Change both: create new Stripe prices, update the `Plan` row (or the `STRIPE_*` variables), then archive the old prices. Use the super-admin Plans and credits page (`/super-admin/plans`), which verifies Stripe price ids against Stripe when a key is configured; SQL or Prisma Studio are an alternative.
+- Prices displayed come from `Plan` (`monthlyPriceMinor`, `annualPriceMinor`, `oneTimePriceMinor`, `featureBullets`, `aiGenerationsPerPeriod`, `maxMembers`); prices charged come from Stripe. Active public subscription plans are listed on `/pricing` and on the sign-up form, where the visitor picks one; a paid choice sends them to Checkout once onboarding finishes. Change both: create new Stripe prices, update the `Plan` row (or the `STRIPE_*` variables), then archive the old prices. Use the super-admin Plans and credits page (`/super-admin/plans`), which verifies Stripe price ids against Stripe when a key is configured; SQL or Prisma Studio are an alternative.
 - Trial size: `app.trialCredits` site setting (default 3).
 - Entitlements per plan: `PlanEntitlement` rows keyed by `ENTITLEMENT_KEYS` (`src/lib/billing/plans.ts`).
 
 ## 9. Demo, super admin and data hygiene
 
 - **Reset the demo**: `railway run pnpm demo:reset` (or the `reset-demo-workspace` cron job, or the *Reset demo* button on `/demo`). Set `DEMO_MODE=false` to hide `/demo` entirely.
-- **Create a new super admin**: register the buyer's address, verify it, then `railway run pnpm admin:promote --email buyer@example.com` (or set `SUPER_ADMIN_EMAIL` and run `pnpm db:seed`). Confirm access at `/super-admin`.
+- **Create a new super admin**: register the buyer's address (sign-up needs no email verification), then `railway run pnpm admin:promote --email buyer@example.com` (or set `SUPER_ADMIN_EMAIL` and run `pnpm db:seed`). Confirm access at `/super-admin`.
 - **Remove seller test data**: delete any test workspaces/users from the Users page (audited) so the buyer starts with a clean `Users` list; the demo workspace is recreated by the seed.
 
 ## 10. Revoking the seller's access
@@ -123,7 +123,7 @@ Check current pricing with each provider; nothing in this repository fixes a pri
 | Railway Storage Bucket | Photographs, audio, documents, PDFs | Stored bytes and requests; retention jobs limit growth |
 | Railway `cron` service | Background jobs | Minutes of run time per schedule (small) |
 | OpenAI | Analysis, wording, transcription | Per-token and per-minute usage for every paid generation; estimated in `AiRun.estimatedCostMicros`; the plan allowances (25/100 generations) bound it per customer |
-| Resend | Transactional email | Emails per month (verification, quote, notification, reminder) |
+| Resend | Transactional email | Emails per month (welcome, password reset, quote, notification, reminder) |
 | Stripe | Payments | Percentage plus fixed fee per successful charge; no monthly fee for standard accounts |
 | Domain and DNS | Public address | Annual renewal |
 

@@ -41,14 +41,15 @@ This repository contains the complete application: marketing site, customer-faci
 - Quote status lifecycle: Draft → Ready → Sent → Viewed → Accepted / Declined / Expired → Archived.
 
 **Workspace**
-- Onboarding creates business settings, a default quote template and a trade-specific starter catalogue (12 trade templates).
+- Sign-up asks for a name, email, password and a plan, then signs the person in and goes straight to onboarding; there is no email verification step.
+- Onboarding creates business settings, a default quote template and a trade-specific starter catalogue (12 trade templates), then sends a paid sign-up on to checkout and everyone else to the dashboard.
 - Customers with tags, billing and job addresses; service catalogue with CSV import/export; quote templates.
 - Analytics dashboard (created/sent/viewed/accepted, values, acceptance rate, create-to-send time, AI usage) with date ranges.
 - Team accounts (Pro): invitations, member/admin roles.
 - Personal account: profile, password change, session revocation, data export, account deletion.
 
 **Billing**
-- Free trial (3 AI generations, no card), Starter ($19/month), Pro ($39/month), annual billing at ten times the monthly price, and a 5-generation credit pack ($9).
+- Free trial (3 AI generations, no card), Starter ($19/month), Pro ($39/month), annual billing at ten times the monthly price, and a 5-generation credit pack ($9). The plan is chosen at sign-up or later from the billing page.
 - Stripe Checkout, Billing Portal, signed webhooks with an idempotency table, invoices, payment-failure handling.
 - Entitlements per plan (logo, branding removal, analytics, templates, team size, CSV export). Clearly labelled mock billing when Stripe keys are absent in development.
 
@@ -108,7 +109,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the code layout and request
 | Framework | Next.js 16 (App Router, standalone output), React 19, TypeScript (strict) |
 | Styling | Tailwind CSS 4, Radix UI primitives, Lucide icons, Recharts |
 | Database | PostgreSQL 16, Prisma 7 with `@prisma/adapter-pg` |
-| Auth | Better Auth 1.7 (Prisma adapter, email + password with verification, password reset, magic link, database sessions) |
+| Auth | Better Auth 1.7 (Prisma adapter, email + password with no verification step, password reset, magic link, database sessions) |
 | Storage | Railway Storage Bucket via AWS SDK v3 (S3-compatible); local filesystem in development; in-memory in tests |
 | Billing | Stripe (Checkout, Billing Portal, webhooks) |
 | AI | OpenAI official SDK (Responses API structured outputs, vision, transcription), Zod validation |

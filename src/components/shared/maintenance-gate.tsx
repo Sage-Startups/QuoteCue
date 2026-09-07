@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { getSessionContext } from "@/lib/auth/session";
 
-const ALWAYS_OPEN = ["/login", "/api/", "/super-admin", "/forgot-password", "/reset-password", "/magic-link", "/verify-email"];
+const ALWAYS_OPEN = ["/login", "/api/", "/super-admin", "/forgot-password", "/reset-password", "/magic-link"];
 
 /**
  * When maintenance mode is enabled in site settings, non-admin visitors see a

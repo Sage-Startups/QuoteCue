@@ -6,13 +6,28 @@ import { SignUpForm } from "@/components/auth/forms";
 import { Alert } from "@/components/ui/misc";
 import { getSessionContext } from "@/lib/auth/session";
 import { getSiteSettings } from "@/lib/config/site-settings";
+import { getPublicPlans } from "@/components/marketing/plans";
+import { formatMoney } from "@/lib/utils/money";
 
 export const metadata: Metadata = { title: "Create your account", description: "Start your free QuoteCue AI trial: three AI quote generations, no card required." };
 
-export default async function SignupPage() {
+export default async function SignupPage({ searchParams }: { searchParams: Promise<{ plan?: string; interval?: string }> }) {
   const session = await getSessionContext();
   if (session) redirect("/app");
-  const settings = await getSiteSettings();
+  const [settings, allPlans, params] = await Promise.all([getSiteSettings(), getPublicPlans(), searchParams]);
+  // The pricing page links here as /signup?plan=pro&interval=annual.
+  const subscriptionPlans = allPlans.filter((plan) => plan.kind === "SUBSCRIPTION");
+  const requested = (params.plan ?? "").toUpperCase();
+  const defaultPlan = subscriptionPlans.some((plan) => plan.key === requested) ? requested : "FREE";
+  const defaultInterval = params.interval === "annual" ? "annual" : "monthly";
+  const plans = subscriptionPlans.map((plan) => ({
+    key: plan.key,
+    name: plan.name,
+    description: plan.description,
+    free: plan.monthlyPriceMinor === 0 && plan.annualPriceMinor === 0,
+    monthlyLabel: plan.monthlyPriceMinor === 0 ? "Free" : `${formatMoney(plan.monthlyPriceMinor, "USD")}/month`,
+    annualLabel: plan.annualPriceMinor === 0 ? "Free" : `${formatMoney(plan.annualPriceMinor, "USD")}/year`,
+  }));
   return (
     <AuthCard
       title="Create your account"
@@ -26,7 +41,7 @@ export default async function SignupPage() {
         </>
       }
     >
-      {!settings["app.registrationEnabled"] ? <Alert variant="warning">Registration is currently closed.</Alert> : <SignUpForm />}
+      {!settings["app.registrationEnabled"] ? <Alert variant="warning">Registration is currently closed.</Alert> : <SignUpForm plans={plans} defaultPlan={defaultPlan} defaultInterval={defaultInterval} />}
     </AuthCard>
   );
 }

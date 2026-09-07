@@ -7,25 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Alert } from "@/components/ui/misc";
 import type { ActionResult } from "@/lib/utils/result";
-import { signUpAction, signInAction, forgotPasswordAction, resetPasswordAction, resendVerificationAction, magicLinkAction } from "@/app/(auth)/actions";
+import { signUpAction, signInAction, forgotPasswordAction, resetPasswordAction, magicLinkAction } from "@/app/(auth)/actions";
+
+export interface SignUpPlan {
+  key: string;
+  name: string;
+  description: string | null;
+  free: boolean;
+  monthlyLabel: string;
+  annualLabel: string;
+}
 
 function useErrors(state: ActionResult<unknown> | null) {
   return (field: string) => (state && !state.ok ? state.fieldErrors?.[field] : undefined);
 }
 
-export function SignUpForm() {
+export function SignUpForm({ plans, defaultPlan, defaultInterval }: { plans: SignUpPlan[]; defaultPlan: string; defaultInterval: "monthly" | "annual" }) {
   const [state, action, pending] = useActionState(signUpAction, null);
   const err = useErrors(state);
-  if (state?.ok) {
-    // The action reports an undelivered verification email rather than telling
-    // someone to check an inbox that will never receive anything.
-    const delivered = !state.message?.includes("could not send");
-    return (
-      <Alert variant={delivered ? "success" : "warning"} title={delivered ? "Check your email" : "Account created, but not yet active"}>
-        {state.message}
-      </Alert>
-    );
-  }
+  const [plan, setPlan] = useState(defaultPlan);
+  const [interval, setInterval] = useState<"monthly" | "annual">(defaultInterval);
   return (
     <form action={action} className="space-y-4" noValidate>
       {state && !state.ok ? <Alert variant="destructive">{state.error}</Alert> : null}
@@ -53,6 +54,46 @@ export function SignUpForm() {
         </label>
       </div>
       {err("terms") ? <p className="text-xs font-medium text-destructive">{err("terms")?.[0]}</p> : null}
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold">Choose your plan</legend>
+        <p className="text-xs text-muted-foreground">You can change this at any time from Billing.</p>
+        {plans.some((option) => !option.free) ? (
+          <div className="flex gap-1 rounded-lg bg-muted p-1 text-sm" role="group" aria-label="Billing interval">
+            {(["monthly", "annual"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setInterval(value)}
+                aria-pressed={interval === value}
+                className={`flex-1 rounded-md px-3 py-1.5 font-medium capitalize ${interval === value ? "bg-white shadow-sm" : "text-muted-foreground"}`}
+              >
+                {value === "annual" ? "Annual (2 months free)" : "Monthly"}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="space-y-2">
+          {plans.map((option) => {
+            const selected = plan === option.key;
+            return (
+              <label
+                key={option.key}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+              >
+                <input type="radio" name="plan" value={option.key} checked={selected} onChange={() => setPlan(option.key)} className="mt-1" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-semibold">{option.name}</span>
+                    <span className="text-sm text-muted-foreground">{interval === "annual" ? option.annualLabel : option.monthlyLabel}</span>
+                  </span>
+                  {option.description ? <span className="mt-0.5 block text-xs text-muted-foreground">{option.description}</span> : null}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <input type="hidden" name="interval" value={interval} />
+      </fieldset>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         Create my account
       </Button>
@@ -145,30 +186,6 @@ export function ResetPasswordForm({ token }: { token: string }) {
       </Field>
       <Button type="submit" className="w-full" size="lg" loading={pending}>
         Change password
-      </Button>
-    </form>
-  );
-}
-
-export function ResendVerificationForm({ defaultEmail }: { defaultEmail?: string }) {
-  const [state, action, pending] = useActionState(resendVerificationAction, null);
-  const err = useErrors(state);
-  const [email, setEmail] = useState(defaultEmail ?? "");
-  if (state?.ok) {
-    return (
-      <Alert variant="success" title="Sent">
-        {state.message}
-      </Alert>
-    );
-  }
-  return (
-    <form action={action} className="space-y-4" noValidate>
-      {state && !state.ok ? <Alert variant="destructive">{state.error}</Alert> : null}
-      <Field label="Email" htmlFor="email" required error={err("email")}>
-        <Input id="email" name="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </Field>
-      <Button type="submit" variant="secondary" className="w-full" loading={pending}>
-        Resend verification email
       </Button>
     </form>
   );

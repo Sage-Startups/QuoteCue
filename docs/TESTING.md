@@ -92,6 +92,8 @@ Guidelines:
 
 `playwright.config.ts` at the repository root defines `testDir: "tests/e2e"`, one worker (the specs share a database and the journey runs serially), a 90 s test timeout, `trace: "retain-on-failure"`, `screenshot: "only-on-failure"`, an `en-GB` locale and the `Europe/London` timezone, and three projects:
 
+Five spec files produce 29 tests in total: 20 in `desktop`, 4 in `tablet` and 5 in `mobile`, because `responsive.spec.ts` runs in all three projects and `mobile.spec.ts` only in `mobile`.
+
 | Project | Viewport | Specs |
 | --- | --- | --- |
 | `desktop` | 1440 × 900 (Desktop Chrome) | every spec except `mobile.spec.ts` |
@@ -109,18 +111,19 @@ pnpm test:e2e -- --project=desktop  # one project
 pnpm test:e2e -- tests/e2e/journey.spec.ts
 ```
 
-To run against a server that is already up (Next.js refuses to start a second `next dev` in the same checkout), set `PLAYWRIGHT_BASE_URL=http://localhost:3000` and point `E2E_DATABASE_URL` at that server's database; the helpers read verification, reset and magic-link emails straight from the `EmailEvent` table with `pg`. `PLAYWRIGHT_CHROMIUM_PATH` overrides the browser binary (the config also picks up `/opt/pw-browsers/chromium` when present); otherwise install one with `pnpm exec playwright install --with-deps chromium`.
+To run against a server that is already up (Next.js refuses to start a second `next dev` in the same checkout), set `PLAYWRIGHT_BASE_URL=http://localhost:3000` and point `E2E_DATABASE_URL` at that server's database; the helpers read reset and magic-link emails straight from the `EmailEvent` table with `pg`. `PLAYWRIGHT_CHROMIUM_PATH` overrides the browser binary (the config also picks up `/opt/pw-browsers/chromium` when present); otherwise install one with `pnpm exec playwright install --with-deps chromium`.
 
 ### Specs
 
 | File | Scenarios |
 | --- | --- |
 | `public.spec.ts` | Homepage links to the live demo; the demo quote builder walkthrough with mock AI; demo quote list, detail and customer view; every marketing page renders and internal links resolve |
-| `journey.spec.ts` (serial) | Registration → verification link from the preview email → onboarding → dashboard; create a customer; the full seven-step wizard from a pasted message with photo and voice-note uploads, AI analysis, pricing, wording, PDF preview and sending; the customer opens the secure link in a separate browser context (quote becomes *Viewed*) and accepts; mock Stripe checkout upgrades the plan; a promoted super admin reaches the console and manages users and workspaces; a second user cannot open `/super-admin` or the first workspace's quote; password reset revokes sessions and signs in again |
+| `signup-flow.spec.ts` (serial) | Three scenarios for the sign-up flow: the free plan goes from `/signup` straight to `/onboarding` (no verification screen, no "Check your email" text) and on to the dashboard, with `emailVerified` true in the database; `/signup?plan=starter` preselects the Starter card and, after onboarding, ends at checkout; a second sign-up with an address that is already registered is refused with an "already exists" message on the form (the test clears the cookies first, because the first sign-up leaves the browser signed in and `/signup` redirects a signed-in visitor away) |
+| `journey.spec.ts` (serial) | Registration → onboarding → dashboard; create a customer; the full seven-step wizard from a pasted message with photo and voice-note uploads, AI analysis, pricing, wording, PDF preview and sending; the customer opens the secure link in a separate browser context (quote becomes *Viewed*) and accepts; mock Stripe checkout upgrades the plan; a promoted super admin reaches the console and manages users and workspaces; a second user cannot open `/super-admin` or the first workspace's quote; password reset revokes sessions and signs in again |
 | `responsive.spec.ts` | Landing page fits each viewport without horizontal overflow and has labelled navigation; demo dashboard and quote list adapt; forms have labels and visible keyboard focus; empty and error states render |
 | `mobile.spec.ts` | Creates a quote end to end from a phone-sized viewport |
 
-`tests/e2e/helpers.ts` provides `registerAndVerify` (which also clears the registration rate-limit window for the loopback address so repeated runs do not trip the production limit of five sign-ups per ten minutes), `signIn`, `completeOnboarding`, `latestEmailLink`, `promoteToSuperAdmin` and `noHorizontalOverflow`.
+`tests/e2e/helpers.ts` provides `registerAndVerify(page, name?, plan?)`, `signIn`, `completeOnboarding`, `latestEmailLink`, `promoteToSuperAdmin` and `noHorizontalOverflow`. Despite its name, `registerAndVerify` no longer reads a verification email: it fills in the sign-up form, optionally ticks the `STARTER` or `PRO` plan card when a plan is passed, submits and waits for `/onboarding` or `/app`. It also clears the registration rate-limit window for the loopback address first, so repeated runs do not trip the production limit of five sign-ups per ten minutes. `latestEmailLink` is still used for password-reset and magic links.
 
 ### Screenshots
 

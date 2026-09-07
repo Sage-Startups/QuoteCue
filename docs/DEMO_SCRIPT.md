@@ -6,8 +6,8 @@ A walkthrough for showing QuoteCue AI to a buyer or a prospective customer. Part
 
 - Run the app locally with `DEMO_MODE=true` (see [SETUP.md](SETUP.md)) or use a deployment with `DEMO_MODE=true`. Part 2 assumes a development environment: no `OPENAI_API_KEY` (mock AI), no `RESEND_API_KEY` (email previews at `/app/dev/emails`), no `STRIPE_SECRET_KEY` (mock checkout). Everything also works with real keys; only the "mock" labels disappear.
 - Seed the database (`pnpm db:seed`) so plans, trade templates and the Northstar demo exist; run `pnpm demo:reset` if the demo has been played with.
-- Have one account already verified and promoted (`pnpm admin:promote --email you@example.com`) for the super-admin part. For the sign-up part, prepare a second email address.
-- Email verification for a **brand-new** account cannot be read from `/app/dev/emails` because that inbox needs a workspace; keep a database console ready for the query in step 8, or configure a real `RESEND_API_KEY` for the demo.
+- Have one account already registered and promoted (`pnpm admin:promote --email you@example.com`) for the super-admin part. For the sign-up part, prepare a second email address.
+- The welcome email sent at sign-up cannot be read from `/app/dev/emails`, because that inbox needs a workspace. It is not needed for the demo; query `EmailEvent` directly if you want to show it.
 - Open the browser at 1440 px width, with a mobile emulation ready (375 px) for one quick responsive check.
 
 ## Part 1 — Public demo (`/demo`)
@@ -29,21 +29,13 @@ A walkthrough for showing QuoteCue AI to a buyer or a prospective customer. Part
 
 ## Part 2 — The real application
 
-**6. Sign up (30 s).** Open `/signup` in a private window. Enter a name, the second email address and a password (10+ characters). Note the neutral success message.
+**6. Sign up (45 s).** Open `/signup` in a private window. Enter a name, the second email address and a password (10+ characters), tick the terms box and choose a plan: the cards list the public subscription plans with a monthly/annual toggle, and the free plan is selected by default. Mention that the pricing page links straight here with a plan preselected (`/signup?plan=pro&interval=annual`). Submit: there is no email to check, the account is created and signed in, and the browser goes straight to onboarding. A paid choice is remembered in a short-lived cookie until the workspace exists.
 
-**7. Verify (30 s).** In development the verification email is stored instead of sent. Read the link from the database:
+**7. Onboarding (60 s).** Fill in the business name, choose a trade (twelve templates: electrician, plumber, builder, heating engineer, roofer, landscaper, joiner, painter and decorator, handyman, cleaning, property maintenance, general), currency, tax mode and rate, labour rate, call-out fee, payment terms, validity and brand colour; optionally upload a logo. Leave "include starter catalogue" and "create a sample quote" ticked. Submit: the workspace, business settings, default template, catalogue and three trial generations are created, and the free plan chosen in step 6 goes straight to the dashboard. Had a paid plan been chosen, this is where the browser would go to Stripe Checkout (the mock checkout in development).
 
-```sql
-SELECT "textPreview" FROM "EmailEvent" WHERE kind = 'VERIFY_EMAIL' ORDER BY "createdAt" DESC LIMIT 1;
-```
+**8. Dashboard and catalogue (30 s).** Show the dashboard (empty stats, the sample quote, the "AI generations" usage indicator in the sidebar showing the three trial credits). Open **Catalogue** to show the trade-specific starter items with prices, units and internal costs, plus CSV import/export.
 
-Open the link: the account is verified, signed in automatically and redirected to onboarding. (With Resend configured, simply click the link in the email. After onboarding, every later email is visible at `/app/dev/emails`.)
-
-**8. Onboarding (60 s).** Fill in the business name, choose a trade (twelve templates: electrician, plumber, builder, heating engineer, roofer, landscaper, joiner, painter and decorator, handyman, cleaning, property maintenance, general), currency, tax mode and rate, labour rate, call-out fee, payment terms, validity and brand colour; optionally upload a logo. Leave "include starter catalogue" and "create a sample quote" ticked. Submit: the workspace, business settings, default template, catalogue and three trial generations are created.
-
-**9. Dashboard and catalogue (30 s).** Show the dashboard (empty stats, the sample quote, the "AI generations" usage indicator in the sidebar showing the three trial credits). Open **Catalogue** to show the trade-specific starter items with prices, units and internal costs, plus CSV import/export.
-
-**10. The quote wizard (2 min).** Open the sample quote or click **New quote**. Walk the seven steps:
+**9. The quote wizard (2 min).** Open the sample quote or click **New quote**. Walk the seven steps:
 
 1. *Customer* — pick or create the customer (contact, email, job address).
 2. *Capture the enquiry* — paste the customer's message, add job notes, record a voice note in the browser or upload audio (transcribed; free), and upload two or three job photographs (direct-to-bucket upload with re-encoding; previews appear).
@@ -53,15 +45,15 @@ Open the link: the account is verified, signed in automatically and redirected t
 6. *Review* — the customer-facing preview and PDF download.
 7. *Send* — enter the customer's email, edit the message, choose the follow-up reminder days, send. In preview mode the timeline notes "not delivered"; the quote moves to **Sent** and a secure link is created.
 
-**11. Customer experience (60 s).** Copy the customer link from the quote page's actions (next to **Rotate customer link**) or open the QUOTE_SENT email in `/app/dev/emails`, and open it in another private window: `/q/<token>` shows the branded quote, the PDF download and the accept/decline form. Accept with a typed name and the terms box. Back in the app: status **Accepted**, the acceptance record with signature and total, the timeline (sent → viewed → accepted), and the owner notification emails in `/app/dev/emails`. Mention link rotation and expiry from the quote page.
+**10. Customer experience (60 s).** Copy the customer link from the quote page's actions (next to **Rotate customer link**) or open the QUOTE_SENT email in `/app/dev/emails`, and open it in another private window: `/q/<token>` shows the branded quote, the PDF download and the accept/decline form. Accept with a typed name and the terms box. Back in the app: status **Accepted**, the acceptance record with signature and total, the timeline (sent → viewed → accepted), and the owner notification emails in `/app/dev/emails`. Mention link rotation and expiry from the quote page.
 
-**12. Analytics (30 s).** Open `/app/analytics`: created/sent/viewed/accepted, values, acceptance rate, create-to-send time and AI usage with date ranges; explain that advanced analytics and CSV export are Pro/Starter entitlements.
+**11. Analytics (30 s).** Open `/app/analytics`: created/sent/viewed/accepted, values, acceptance rate, create-to-send time and AI usage with date ranges; explain that advanced analytics and CSV export are Pro/Starter entitlements.
 
-**13. Billing (45 s).** Open `/app/billing`: current plan (Free trial, 1 generation left), usage, the plan cards (Starter $19/month or $190/year, Pro $39/month or $390/year, credit pack $9) and the invoices table. Click **Upgrade to Pro**: in development this opens the clearly labelled **mock checkout**; complete it and return to billing showing Pro active with 100 generations, a mock invoice, the "manage billing" and "cancel at period end" controls. Explain that production uses Stripe Checkout, the Billing Portal and signed webhooks. If time allows, open **Team** to invite a member (Pro allows five).
+**12. Billing (45 s).** Open `/app/billing`: current plan (Free trial, 1 generation left), usage, the plan cards (Starter $19/month or $190/year, Pro $39/month or $390/year, credit pack $9) and the invoices table. Click **Upgrade to Pro**: in development this opens the clearly labelled **mock checkout**; complete it and return to billing showing Pro active with 100 generations, a mock invoice, the "manage billing" and "cancel at period end" controls. Explain that production uses Stripe Checkout, the Billing Portal and signed webhooks. If time allows, open **Team** to invite a member (Pro allows five).
 
-**14. Super admin (60 s).** Sign in as the promoted account and open `/super-admin`: the platform overview (users, workspaces, subscriptions, quotes, AI runs and estimated cost, email counts, storage, cron heartbeat) with the date range and the "exclude demo" toggle. Open **Users**, search for the account created in step 6, open it: memberships, audit history, and the admin actions (suspend with reason, revoke sessions, change role, grant credits, complimentary plan). Grant two credits with a reason and show the entry in the audit log on the same page. Then open one or two of the other sections (for example Workspaces, where a support session is started with a reason, and Site settings or Feature flags, where every change is validated and audited); all nineteen sections are implemented (see `docs/SUPER_ADMIN.md`).
+**13. Super admin (60 s).** Sign in as the promoted account and open `/super-admin`: the platform overview (users, workspaces, subscriptions, quotes, AI runs and estimated cost, email counts, storage, cron heartbeat) with the date range and the "exclude demo" toggle. Open **Users**, search for the account created in step 6, open it: memberships, audit history, and the admin actions (suspend with reason, revoke sessions, change role, grant credits, complimentary plan). Grant two credits with a reason and show the entry in the audit log on the same page. Then open one or two of the other sections (for example Workspaces, where a support session is started with a reason, and Site settings or Feature flags, where every change is validated and audited); all nineteen sections are implemented (see `docs/SUPER_ADMIN.md`).
 
-**15. Close (20 s).** Recap: one codebase covering marketing site, product, customer pages, billing, AI, email, background jobs and administration; deployable on Railway from one Dockerfile; documented in `docs/`. Offer the [FLIPPA_LISTING_NOTES.md](../FLIPPA_LISTING_NOTES.md) summary and the technical docs for due diligence.
+**14. Close (20 s).** Recap: one codebase covering marketing site, product, customer pages, billing, AI, email, background jobs and administration; deployable on Railway from one Dockerfile; documented in `docs/`. Offer the [FLIPPA_LISTING_NOTES.md](../FLIPPA_LISTING_NOTES.md) summary and the technical docs for due diligence.
 
 ## Talking points if asked
 

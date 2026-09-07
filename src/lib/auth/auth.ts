@@ -7,7 +7,6 @@ import { magicLink } from "better-auth/plugins";
 import { prisma } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { sendEmail } from "@/lib/email";
-import { trackEvent } from "@/lib/services/app-events";
 
 const env = getEnv();
 
@@ -52,10 +51,14 @@ export const auth = betterAuth({
   },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // Sign-up admits the account straight away: an unverified account that
+    // depends on a delivered email locks people out whenever mail is
+    // misconfigured, and the address is confirmed in practice by the password
+    // reset flow. Reset emails are still sent.
+    requireEmailVerification: false,
     minPasswordLength: 10,
     maxPasswordLength: 128,
-    autoSignIn: false,
+    autoSignIn: true,
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
@@ -69,32 +72,16 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    sendOnSignUp: true,
+    sendOnSignUp: false,
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
-    sendVerificationEmail: async ({ user, url }) => {
-      const outcome = await sendEmail({
-        kind: "VERIFY_EMAIL",
-        to: user.email,
-        userId: user.id,
-        variables: { name: user.name || "there", verifyUrl: url },
-      });
-      warnIfUndelivered("verification", user.email, outcome);
-    },
-    afterEmailVerification: async (user) => {
-      await trackEvent({ name: "email_verified", userId: user.id });
-      await sendEmail({
-        kind: "WELCOME",
-        to: user.email,
-        userId: user.id,
-        variables: { name: user.name || "there", dashboardUrl: `${env.APP_URL}/app` },
-      });
-    },
-  },
-  user: {
-    deleteUser: { enabled: false },
   },
   databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => ({ data: { ...user, emailVerified: true } }),
+      },
+    },
     session: {
       create: {
         before: async (session) => {

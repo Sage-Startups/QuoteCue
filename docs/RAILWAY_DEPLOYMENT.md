@@ -159,7 +159,7 @@ Files in the bucket are not included in a database dump; sync the bucket separat
 
 ## 18. Promote the first super admin
 
-1. Open the site, sign up with the address you set as `SUPER_ADMIN_EMAIL`, and verify the email (Resend delivers it in production).
+1. Open the site and sign up with the address you set as `SUPER_ADMIN_EMAIL`. There is no verification step: the account is created, signed in and taken to onboarding. Leave the free plan selected, or you will be sent to Stripe Checkout after onboarding.
 2. Complete onboarding so the account has a workspace.
 3. Promote the account. Either run the command through the Railway CLI, which injects the service's variables:
 
@@ -212,20 +212,21 @@ Everything under `scripts/` runs through `tsx`, a dev dependency the image prune
 ```
 ./docker/entrypoint.sh ops doctor                    # which providers are live, and what is misconfigured
 ./docker/entrypoint.sh ops email-status 20           # recent sends with their delivery status and provider errors
-./docker/entrypoint.sh ops verify-email you@example.com   # let an account in when its verification email bounced
+./docker/entrypoint.sh ops verify-email you@example.com   # mark an old unverified account as verified; new accounts already are
 ./docker/entrypoint.sh ops promote you@example.com        # SUPER_ADMIN (or SUPPORT_ADMIN / USER)
 ```
 
 Run them as a one-off command on the service. `verify-email` and `promote` are recorded in `AdminAuditLog` with the actor `ops-cli`.
 
-If sign-up says the account is not active, `ops doctor` and `ops email-status` will say why: a `PREVIEW` status means `RESEND_API_KEY` is not set and nothing was delivered; a `FAILED` status carries Resend's own error, most often an unverified sending domain or an `EMAIL_FROM` still pointing at `example.com`.
+If an email does not arrive (the welcome email at sign-up, a password reset, a quote), `ops doctor` and `ops email-status` will say why: a `PREVIEW` status means `RESEND_API_KEY` is not set and nothing was delivered; a `FAILED` status carries Resend's own error, most often an unverified sending domain or an `EMAIL_FROM` still pointing at `example.com`. Sign-up itself no longer depends on a delivered email.
 
 ## 20. Verify the deployment
 
 - [ ] `https://<domain>/api/health` returns `status: ok`
 - [ ] Signed in as super admin, `https://<domain>/api/health/system` shows `providers` = `{ ai: "openai", email: "resend", stripe: "stripe", storage: "railway" }` and every check `ok` (the cron check is `ok` after the first heartbeat)
 - [ ] `/super-admin` opens and the header badge says `production`
-- [ ] Sign up with a second address: verification email arrives, onboarding completes, the sample quote appears
+- [ ] Sign up with a second address on the free plan: sign-up goes straight to onboarding, the welcome email arrives, onboarding completes and the sample quote appears
+- [ ] Sign up with a third address choosing a paid plan: onboarding ends at Stripe Checkout for that plan and interval
 - [ ] Upload a photograph in the wizard: presign → PUT → finalise succeeds and the preview shows
 - [ ] Run the AI analysis on a quote: the timeline says "AI analysis completed" (without "(mock provider)")
 - [ ] Send a quote to yourself: the email arrives, the `/q/<token>` link opens, the PDF downloads, accepting records the acceptance and the owner receives the notification

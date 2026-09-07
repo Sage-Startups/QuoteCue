@@ -46,11 +46,11 @@ Templates are Markdown with `{{variables}}`, seeded from `src/lib/email/template
 
 | Kind | Name | Extra variables (all templates also get `productName`, `supportEmail`, `appUrl`) | Sent by |
 | --- | --- | --- | --- |
-| `WELCOME` | Welcome | `name`, `dashboardUrl` | After email verification (`auth.ts`) |
-| `VERIFY_EMAIL` | Verify email | `name`, `verifyUrl` | Sign-up and "resend verification" |
+| `WELCOME` | Welcome | `name`, `dashboardUrl` | Sign-up (`signUpAction`) |
+| `VERIFY_EMAIL` | Verify email | `name`, `verifyUrl` | Nothing. Addresses are no longer verified; the template and its row are kept so the flow can be restored |
 | `PASSWORD_RESET` | Password reset | `name`, `resetUrl` | Forgot password; super-admin "send password reset" |
 | `MAGIC_LINK` | Magic link | `magicLinkUrl` | Magic-link sign-in |
-| `ACCOUNT_EXISTS` | Account already exists | `loginUrl`, `resetUrl` | Sign-up with an existing address (enumeration-safe) |
+| `ACCOUNT_EXISTS` | Account already exists | `loginUrl`, `resetUrl` | Nothing. Sign-up now says so on the form instead ([SECURITY.md](SECURITY.md)) |
 | `TEAM_INVITE` | Team invitation | `inviterName`, `workspaceName`, `inviteUrl`, `role` | `services/team.ts` |
 | `QUOTE_SENT` | Quote sent to customer | `customerName`, `businessName`, `quoteNumber`, `quoteTitle`, `total`, `expiryDate`, `quoteUrl`, `message` | `sendQuoteToCustomer` |
 | `QUOTE_VIEWED` | Quote viewed notification | `customerName`, `quoteNumber`, `quoteTitle`, `quoteAdminUrl` | First customer view (`recordPublicView`) |
@@ -86,11 +86,11 @@ Use only the variables listed for that kind; the template will otherwise fail va
 With no `RESEND_API_KEY`:
 
 - nothing is delivered; each email is stored as `PREVIEW` with its HTML and text;
-- `/app/dev/emails` (development only, hidden in production) lists the previews addressed to the signed-in user, their workspace or their email address, and renders the selected one in a sandboxed iframe; links open in a new tab, so verification, reset, invitation and quote links can be followed;
+- `/app/dev/emails` (development only, hidden in production) lists the previews addressed to the signed-in user, their workspace or their email address, and renders the selected one in a sandboxed iframe; links open in a new tab, so reset, invitation and quote links can be followed;
 - the quote timeline says "(email preview mode: not delivered)" and the send dialog reports preview mode;
 - the `cleanup-sessions` job removes stored preview HTML older than 14 days.
 
-The inbox needs a workspace, so the very first account's verification link must be read from the database instead (see [SETUP.md](SETUP.md)):
+The inbox needs a workspace, so an email sent before onboarding finishes (the welcome email, or a password reset requested by a brand-new account) has to be read from the database instead:
 
 ```sql
 SELECT "toEmail", subject, "textPreview" FROM "EmailEvent" ORDER BY "createdAt" DESC LIMIT 1;
@@ -101,7 +101,7 @@ SELECT "toEmail", subject, "textPreview" FROM "EmailEvent" ORDER BY "createdAt" 
 - `email_sending` (feature flag) blocks `sendQuoteToCustomer` when off; auth and billing emails are unaffected.
 - `emailSend` rate limit: 30 quote sends per hour per workspace.
 - `contactForm`: 3 submissions per 15 minutes per IP, plus a honeypot field.
-- Auth emails are protected by the auth rate limits ([SECURITY.md](SECURITY.md)) and always return neutral messages so addresses cannot be enumerated.
+- Auth emails are protected by the auth rate limits ([SECURITY.md](SECURITY.md)); the reset and magic-link flows return neutral messages so addresses cannot be enumerated, while sign-up names a duplicate address as a deliberate trade-off ([SECURITY.md](SECURITY.md)).
 
 ## Monitoring
 

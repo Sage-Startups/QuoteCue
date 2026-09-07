@@ -4,7 +4,7 @@ The platform console lives at `/super-admin` (`src/app/super-admin/**`, shared U
 
 ## Promoting an administrator
 
-Roles are never granted through the UI to someone who has not registered. Create a normal account first (sign up, verify the email address), then either:
+Roles are never granted through the UI to someone who has not registered. Create a normal account first (sign up; there is no email verification step), then either:
 
 ```bash
 pnpm admin:promote --email you@example.com              # SUPER_ADMIN (default)
@@ -47,7 +47,7 @@ Platform statistics for a selectable date range (`?range=7d|30d|90d|custom&from&
 
 ### Users (`/super-admin/users`)
 
-List with search and filters (role, verified, suspended), pagination (25 per page) and a CSV export (`/super-admin/users/export`, up to 5,000 rows). The detail page (`/super-admin/users/[id]`) shows the account, its workspace memberships and recent audit entries, and offers these actions (all in `users/actions.ts`, wrapped by `adminAction` and recorded with `adminAudit`):
+List with search and filters (role, verified, suspended), pagination (25 per page) and a CSV export (`/super-admin/users/export`, up to 5,000 rows). Every account created since the verification step was removed is stored as verified, so the verified filter and badge only single out older accounts; an unverified account still cannot be given an admin role. The detail page (`/super-admin/users/[id]`) shows the account, its workspace memberships and recent audit entries, and offers these actions (all in `users/actions.ts`, wrapped by `adminAction` and recorded with `adminAudit`):
 
 | Action | Audit action | Notes |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ Viewing an individual quote's private content is separate from support mode: `vi
 
 ## Maintenance mode
 
-The `app.maintenanceMode` site setting is enforced by `MaintenanceGate` (`src/components/shared/maintenance-gate.tsx`), mounted in the root layout. When it is on, visitors see a maintenance page with the `app.maintenanceMessage` text and the support email. Signed-in super admins, the console (`/super-admin`), API routes (`/api/`) and the sign-in routes (`/login`, `/forgot-password`, `/reset-password`, `/magic-link`, `/verify-email`) stay open, so an administrator can always switch it off again from Site settings, which shows a warning while it is on.
+The `app.maintenanceMode` site setting is enforced by `MaintenanceGate` (`src/components/shared/maintenance-gate.tsx`), mounted in the root layout. When it is on, visitors see a maintenance page with the `app.maintenanceMessage` text and the support email. Signed-in super admins, the console (`/super-admin`), API routes (`/api/`) and the sign-in routes (`/login`, `/forgot-password`, `/reset-password`, `/magic-link`) stay open, so an administrator can always switch it off again from Site settings, which shows a warning while it is on.
 
 ## Backing data
 

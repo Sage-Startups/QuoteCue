@@ -38,8 +38,8 @@ Railway cron ──────► same image, `entrypoint.sh jobs` → dist/job
 │   ├── proxy.ts                Edge proxy (security headers, CSP nonce, UX redirect)
 │   ├── app/                    Routes
 │   │   ├── (marketing)/        Public site: /, features, how-it-works, pricing, templates, about, contact, faq, legal
-│   │   ├── (auth)/             login, signup, verify-email, forgot-password, reset-password, magic-link (+ actions.ts)
-│   │   ├── onboarding/         Workspace creation after first sign-in
+│   │   ├── (auth)/             login, signup (name, email, password, plan), forgot-password, reset-password, magic-link (+ actions.ts)
+│   │   ├── onboarding/         Workspace creation straight after sign-up; sends a paid sign-up on to checkout
 │   │   ├── app/                Authenticated product (dashboard, quotes, customers, catalogue, templates,
 │   │   │                       analytics, team, billing, settings, account, help, dev/emails)
 │   │   ├── q/[token]/          Public customer quote page and PDF
