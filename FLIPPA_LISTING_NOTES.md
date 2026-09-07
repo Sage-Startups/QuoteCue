@@ -153,6 +153,6 @@ Follow `docs/DEMO_SCRIPT.md` (about ten minutes):
 
 - Newly built; no operating history, revenue, traffic, customers or subscribers.
 - All nineteen super-admin sections are implemented. Plans can be edited but not created or deleted from the console, and trade templates are deactivated rather than deleted.
-- No end-to-end test suite or CI is committed (unit tests exist; Playwright is installed with a documented plan).
+- Tests are committed and passing: 54 Vitest unit and integration tests against a real PostgreSQL database, and 29 Playwright end-to-end tests covering the quoting journey, sign-up, the public demo and three viewport widths. No CI workflow is committed, so a buyer wiring these into GitHub Actions or Railway is a short task.
 - AI output quality depends on the buyer's OpenAI model choice; prompts are editable.
 - Legal page copy (privacy, terms, cookies) is generated from settings and should be reviewed by the buyer's legal adviser for their jurisdiction.
