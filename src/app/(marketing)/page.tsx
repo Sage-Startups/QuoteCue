@@ -14,12 +14,14 @@ import { Testimonials } from "@/components/marketing/testimonials";
 import { getMarketingContent } from "@/lib/config/marketing-content";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { getEnv } from "@/lib/env";
+import { isDemoAvailable, ctaVisible } from "@/lib/services/demo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata("/");
 }
 
 export default async function HomePage() {
+  const demoAvailable = await isDemoAvailable();
   const [settings, content, plans] = await Promise.all([getSiteSettings(), getMarketingContent(), getPublicPlans()]);
   const env = getEnv();
   const hero = content["home.hero"];
@@ -75,9 +77,11 @@ export default async function HomePage() {
                   </Link>
                 </Button>
               ) : null}
-              <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
-                <Link href={hero.secondaryCta.href}>{hero.secondaryCta.label}</Link>
-              </Button>
+              {ctaVisible(hero.secondaryCta.href, demoAvailable) ? (
+                <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
+                  <Link href={hero.secondaryCta.href}>{hero.secondaryCta.label}</Link>
+                </Button>
+              ) : null}
             </div>
             {hero.note ? <p className="mt-4 text-sm text-muted-foreground">{hero.note}</p> : null}
           </div>
@@ -258,9 +262,11 @@ export default async function HomePage() {
                 </Link>
               </Button>
             ) : null}
-            <Button asChild size="lg" variant="outline" className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white sm:w-auto">
-              <Link href={finalCta.secondaryCta.href}>{finalCta.secondaryCta.label}</Link>
-            </Button>
+            {ctaVisible(finalCta.secondaryCta.href, demoAvailable) ? (
+              <Button asChild size="lg" variant="outline" className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white sm:w-auto">
+                <Link href={finalCta.secondaryCta.href}>{finalCta.secondaryCta.label}</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       </Section>

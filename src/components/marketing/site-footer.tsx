@@ -3,6 +3,7 @@ import type { MarketingValue } from "@/lib/config/marketing-content";
 import type { SiteSettings } from "@/lib/config/site-settings";
 import { BrandLogo } from "./brand-logo";
 import { Container } from "./section";
+import { isDemoPath } from "@/lib/services/demo";
 
 const SOCIAL_LABELS: Record<keyof SiteSettings["branding.socialLinks"], string> = {
   x: "X",
@@ -16,12 +17,14 @@ function isExternal(href: string): boolean {
   return /^https?:\/\//i.test(href);
 }
 
-export function SiteFooter({ settings, footer }: { settings: SiteSettings; footer: MarketingValue<"footer"> }) {
+export function SiteFooter({ settings, footer, demoAvailable = true }: { settings: SiteSettings; footer: MarketingValue<"footer">; demoAvailable?: boolean }) {
   const productName = settings["branding.productName"];
   const companyName = settings["branding.companyName"];
   const address = settings["branding.companyAddress"].trim();
   const social = Object.entries(settings["branding.socialLinks"]).filter(([, href]) => href && href.trim().length > 0) as Array<[keyof SiteSettings["branding.socialLinks"], string]>;
   const year = new Date().getFullYear();
+  // Never link to the demo unless it is actually reachable.
+  const columns = footer.columns.map((column) => ({ ...column, links: column.links.filter((link) => demoAvailable || !isDemoPath(link.href)) }));
 
   return (
     <footer className="border-t bg-navy-950 text-navy-100">
@@ -49,7 +52,7 @@ export function SiteFooter({ settings, footer }: { settings: SiteSettings; foote
               </ul>
             ) : null}
           </div>
-          {footer.columns.map((column) => (
+          {columns.map((column) => (
             <nav key={column.heading} aria-label={column.heading}>
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white">{column.heading}</h2>
               <ul className="mt-4 space-y-1">

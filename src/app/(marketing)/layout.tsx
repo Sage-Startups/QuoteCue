@@ -2,9 +2,10 @@ import { getMarketingSection } from "@/lib/config/marketing-content";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { AnnouncementBanner, SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { isDemoAvailable } from "@/lib/services/demo";
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
-  const [settings, footer] = await Promise.all([getSiteSettings(), getMarketingSection("footer")]);
+  const [settings, footer, demoAvailable] = await Promise.all([getSiteSettings(), getMarketingSection("footer"), isDemoAvailable()]);
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <a
@@ -18,7 +19,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>
-      <SiteFooter settings={settings} footer={footer} />
+      <SiteFooter settings={settings} footer={footer} demoAvailable={demoAvailable} />
     </div>
   );
 }

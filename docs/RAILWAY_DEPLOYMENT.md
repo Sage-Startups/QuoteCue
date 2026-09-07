@@ -92,7 +92,7 @@ EMAIL_FROM=QuoteCue AI <noreply@yourdomain.com>
 SUPPORT_EMAIL=support@yourdomain.com
 ```
 
-The sending domain must be verified in Resend. See [EMAIL.md](EMAIL.md). Also set `DEMO_MODE=true` if you want the public `/demo` experience (recommended for a sales listing) and optionally `ANALYTICS_ID`.
+The sending domain must be verified in Resend. See [EMAIL.md](EMAIL.md). Also set `DEMO_MODE=true` if you want the public `/demo` experience (recommended for a sales listing) and optionally `ANALYTICS_ID`. The demo needs both: `DEMO_MODE=true` **and** a seeded demo workspace (step 19). Until both are true the demo is not advertised anywhere on the marketing site and `/demo` returns 404, so a visitor never meets a dead link.
 
 ## 11. Migrations
 

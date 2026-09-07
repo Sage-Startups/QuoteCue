@@ -11,6 +11,7 @@ import { getMarketingContent } from "@/lib/config/marketing-content";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/utils/money";
+import { isDemoAvailable } from "@/lib/services/demo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata("/templates", { title: "Trade templates" });
@@ -50,6 +51,7 @@ function parseStrings(value: unknown): string[] {
 }
 
 export default async function TemplatesPage() {
+  const demoAvailable = await isDemoAvailable();
   const [templates, content, settings] = await Promise.all([
     prisma.tradeTemplate.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     getMarketingContent(),
@@ -69,9 +71,11 @@ export default async function TemplatesPage() {
             </Link>
           </Button>
         ) : null}
-        <Button asChild size="lg" variant="secondary">
-          <Link href="/demo">Explore the live demo</Link>
-        </Button>
+        {demoAvailable ? (
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/demo">Explore the live demo</Link>
+          </Button>
+        ) : null}
       </PageIntro>
 
       <Section aria-labelledby="templates-heading">

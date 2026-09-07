@@ -6,6 +6,7 @@ import { PageIntro, Section, SectionHeading } from "@/components/marketing/secti
 import { buildPageMetadata } from "@/components/marketing/seo";
 import { getMarketingContent } from "@/lib/config/marketing-content";
 import { getSiteSettings } from "@/lib/config/site-settings";
+import { isDemoAvailable, ctaVisible } from "@/lib/services/demo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata("/how-it-works", { title: "How it works" });
@@ -32,6 +33,7 @@ const STEP_DETAILS: Array<{ points: string[]; note: string }> = [
 ];
 
 export default async function HowItWorksPage() {
+  const demoAvailable = await isDemoAvailable();
   const [content, settings] = await Promise.all([getMarketingContent(), getSiteSettings()]);
   const section = content["home.howItWorks"];
   const registrationEnabled = settings["app.registrationEnabled"];
@@ -47,9 +49,11 @@ export default async function HowItWorksPage() {
             </Link>
           </Button>
         ) : null}
-        <Button asChild size="lg" variant="secondary">
-          <Link href="/demo">Explore the live demo</Link>
-        </Button>
+        {demoAvailable ? (
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/demo">Explore the live demo</Link>
+          </Button>
+        ) : null}
       </PageIntro>
 
       <Section aria-labelledby="steps-heading">
@@ -127,9 +131,11 @@ export default async function HowItWorksPage() {
                 <Link href={content["home.finalCta"].primaryCta.href}>{content["home.finalCta"].primaryCta.label}</Link>
               </Button>
             ) : null}
-            <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
-              <Link href={content["home.finalCta"].secondaryCta.href}>{content["home.finalCta"].secondaryCta.label}</Link>
-            </Button>
+            {ctaVisible(content["home.finalCta"].secondaryCta.href, demoAvailable) ? (
+              <Button asChild size="lg" variant="secondary" className="w-full sm:w-auto">
+                <Link href={content["home.finalCta"].secondaryCta.href}>{content["home.finalCta"].secondaryCta.label}</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       </Section>

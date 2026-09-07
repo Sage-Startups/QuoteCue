@@ -8,6 +8,7 @@ import { buildPageMetadata } from "@/components/marketing/seo";
 import { getMarketingContent } from "@/lib/config/marketing-content";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { cn } from "@/lib/utils/cn";
+import { isDemoAvailable, ctaVisible } from "@/lib/services/demo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildPageMetadata("/features", { title: "Features" });
@@ -65,6 +66,7 @@ const GROUPS: FeatureGroup[] = [
 ];
 
 export default async function FeaturesPage() {
+  const demoAvailable = await isDemoAvailable();
   const [content, settings] = await Promise.all([getMarketingContent(), getSiteSettings()]);
   const cards = [...content["home.inputs"].items, ...content["home.features"].items];
   const used = new Set<string>();
@@ -94,9 +96,11 @@ export default async function FeaturesPage() {
             </Link>
           </Button>
         ) : null}
-        <Button asChild size="lg" variant="secondary">
-          <Link href="/demo">Explore the live demo</Link>
-        </Button>
+        {demoAvailable ? (
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/demo">Explore the live demo</Link>
+          </Button>
+        ) : null}
       </PageIntro>
 
       <nav aria-label="Feature groups" className="border-b bg-white">
@@ -158,9 +162,11 @@ export default async function FeaturesPage() {
                 <Link href={content["home.finalCta"].primaryCta.href}>{content["home.finalCta"].primaryCta.label}</Link>
               </Button>
             ) : null}
-            <Button asChild size="lg" variant="outline" className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white sm:w-auto">
-              <Link href={content["home.finalCta"].secondaryCta.href}>{content["home.finalCta"].secondaryCta.label}</Link>
-            </Button>
+            {ctaVisible(content["home.finalCta"].secondaryCta.href, demoAvailable) ? (
+              <Button asChild size="lg" variant="outline" className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white sm:w-auto">
+                <Link href={content["home.finalCta"].secondaryCta.href}>{content["home.finalCta"].secondaryCta.label}</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       </Section>
