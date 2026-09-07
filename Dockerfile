@@ -44,8 +44,8 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nodejs /app/public ./public
 
 # Cron job runner: bundled entrypoint plus production node_modules and Prisma artefacts.
-COPY --from=build --chown=nextjs:nodejs /app/dist ./dist
-COPY --from=build --chown=nextjs:nodejs /app/node_modules ./jobs_node_modules
+COPY --from=build --chown=nextjs:nodejs /app/dist ./jobs
+COPY --from=build --chown=nextjs:nodejs /app/node_modules ./jobs/node_modules
 COPY --from=build --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=build --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build --chown=nextjs:nodejs /app/docker/entrypoint.sh ./docker/entrypoint.sh

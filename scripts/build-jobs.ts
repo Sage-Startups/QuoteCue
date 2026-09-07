@@ -1,6 +1,9 @@
 /**
- * Bundles the cron job runner into dist/jobs/run.js and the seed into
- * dist/seed.js for the Docker image.
+ * Bundles the cron job runner and the seed into dist/ for the Docker image,
+ * which copies that directory to /app/jobs with the production node_modules
+ * beside it. Dependencies must resolve by walking up from the bundle's own
+ * directory: NODE_PATH covers `require` but not the dynamic `import()` the
+ * Prisma client uses internally.
  * Node modules stay external and are resolved from the production node_modules.
  */
 import { build } from "esbuild";
@@ -26,7 +29,7 @@ async function main() {
   await build({
     ...common,
     entryPoints: [path.resolve(__dirname, "../src/jobs/run.ts")],
-    outfile: path.resolve(__dirname, "../dist/jobs/run.js"),
+    outfile: path.resolve(__dirname, "../dist/run.js"),
   });
   // The seed is bundled too: tsx is a dev dependency and is pruned from the
   // image, so `tsx prisma/seed.ts` cannot run inside a container.

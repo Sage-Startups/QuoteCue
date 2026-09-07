@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it, beforeAll } from "vitest";
 
 const root = path.resolve(__dirname, "../..");
-const runner = path.join(root, "dist/jobs/run.js");
+const runner = path.join(root, "dist/run.js");
 const seed = path.join(root, "dist/seed.js");
 
 /**

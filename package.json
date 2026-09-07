@@ -25,7 +25,8 @@
     "jobs:build": "tsx scripts/build-jobs.ts",
     "admin:promote": "tsx scripts/admin-promote.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verify:image": "sh scripts/verify-image-layout.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1124.0",

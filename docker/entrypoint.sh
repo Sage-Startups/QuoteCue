@@ -4,7 +4,17 @@
 #   jobs     - run the cron job runner once and exit
 #   migrate  - apply pending Prisma migrations and exit
 #   seed     - load platform data once (plans, prompts, templates, flags)
+#
+# The bundles live in /app/jobs with the production node_modules beside them, so
+# both `require` and the dynamic `import()` inside the Prisma client resolve by
+# walking up from the bundle. NODE_PATH is not enough: it does not apply to ESM.
 set -e
+
+# Both resolution mechanisms are needed. NODE_PATH lets the Prisma CLI's
+# CommonJS `require("prisma/config")` find its own package; the bundles sit in
+# the same directory as node_modules because NODE_PATH does not apply to the
+# dynamic `import()` the Prisma client uses at query time.
+export NODE_PATH=/app/jobs/node_modules
 
 is_true() {
   case "$1" in
@@ -14,37 +24,37 @@ is_true() {
 }
 
 run_migrations() {
-  NODE_PATH=/app/jobs_node_modules node /app/jobs_node_modules/prisma/build/index.js migrate deploy
+  node /app/jobs/node_modules/prisma/build/index.js migrate deploy
 }
 
 run_seed() {
-  NODE_PATH=/app/jobs_node_modules node /app/dist/seed.js
+  node /app/jobs/seed.js
 }
 
 case "${1:-web}" in
   web)
-    # Migrations are applied before serving so a fresh deployment comes up with
-    # a usable schema instead of failing every request with "table does not
-    # exist". Prisma takes an advisory lock, so extra replicas wait rather than
-    # race. Set SKIP_MIGRATIONS_ON_START=true where a separate pre-deploy step
-    # or a DBA owns schema changes.
+    # Migrations run before serving so a fresh deployment comes up with a usable
+    # schema. Prisma takes an advisory lock, so replicas wait rather than race.
+    # Set SKIP_MIGRATIONS_ON_START=true where a pre-deploy step owns them.
     if is_true "$SKIP_MIGRATIONS_ON_START"; then
       echo "[entrypoint] SKIP_MIGRATIONS_ON_START is set; not applying migrations"
     else
       echo "[entrypoint] applying database migrations"
       run_migrations
     fi
-    # Seeding stays opt-in: it writes reference data, so it is never automatic.
+    # Seeding is opt-in and never fatal: it only loads reference data, so a
+    # failure here must not take the site down or start a restart loop.
     if is_true "$SEED_ON_START"; then
       echo "[entrypoint] SEED_ON_START is set; seeding platform data (idempotent)"
-      run_seed
+      if ! run_seed; then
+        echo "[entrypoint] WARNING: seeding failed; starting the server anyway. Run './docker/entrypoint.sh seed' to retry."
+      fi
     fi
     exec node server.js
     ;;
   jobs)
     shift
-    export NODE_PATH=/app/jobs_node_modules
-    exec node dist/jobs/run.js "$@"
+    exec node /app/jobs/run.js "$@"
     ;;
   migrate)
     run_migrations

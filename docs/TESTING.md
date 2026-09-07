@@ -133,7 +133,18 @@ pnpm lint        # ESLint (eslint.config.mjs, Next.js rules)
 pnpm typecheck   # tsc --noEmit with strict TypeScript
 ```
 
-Run both plus `pnpm test` and `pnpm test:e2e` before every deployment; there is no CI workflow in the repository, so wire these into GitHub Actions or Railway's build if you want them enforced automatically. The quality gate used before handover was `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm jobs:build`, `pnpm build` and `pnpm audit --prod`. The container image itself was not built in the authoring environment (no Docker daemon was available there), so run `docker build -t quotecue .` once on a machine with Docker, or rely on Railway's build, before relying on the image.
+Run both plus `pnpm test` and `pnpm test:e2e` before every deployment; there is no CI workflow in the repository, so wire these into GitHub Actions or Railway's build if you want them enforced automatically. ### Verifying the container layout
+
+The image copies `dist/` to `/app/jobs` with the production `node_modules` beside it, which is not how the repository is laid out. Running a bundle from the repo root therefore proves less than it appears to: `node_modules` is adjacent there by accident, so a bundle that passes `pnpm test` can still fail in the container with `Cannot find package '@prisma/client'`. `NODE_PATH` does not close the gap, because it applies to CommonJS `require` but not to the dynamic `import()` the Prisma client uses at query time.
+
+```bash
+createdb layout_check
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/layout_check pnpm verify:image
+```
+
+`scripts/verify-image-layout.sh` assembles the real directory structure in a temporary directory and runs the `migrate`, `seed` and `jobs` entrypoints against that database. Run it after changing the Dockerfile, the entrypoint or the bundler.
+
+The quality gate used before handover was `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm jobs:build`, `pnpm verify:image`, `pnpm build` and `pnpm audit --prod`. The container image itself was not built in the authoring environment (no Docker daemon was available there), so run `docker build -t quotecue .` once on a machine with Docker, or rely on Railway's build, before relying on the image.
 
 ## Manual smoke test
 
