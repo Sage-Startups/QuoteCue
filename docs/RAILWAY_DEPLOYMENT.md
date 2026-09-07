@@ -205,6 +205,21 @@ railway run pnpm demo:reset
 
 The cron job `reset-demo-workspace` also rebuilds it every `app.demoResetHours` (default 24) while `DEMO_MODE=true`. The seed is idempotent and does not overwrite plans, prompts or templates you have edited.
 
+## Operator commands on a deployment
+
+Everything under `scripts/` runs through `tsx`, a dev dependency the image prunes, so those commands are for a local checkout only. The image carries the equivalents:
+
+```
+./docker/entrypoint.sh ops doctor                    # which providers are live, and what is misconfigured
+./docker/entrypoint.sh ops email-status 20           # recent sends with their delivery status and provider errors
+./docker/entrypoint.sh ops verify-email you@example.com   # let an account in when its verification email bounced
+./docker/entrypoint.sh ops promote you@example.com        # SUPER_ADMIN (or SUPPORT_ADMIN / USER)
+```
+
+Run them as a one-off command on the service. `verify-email` and `promote` are recorded in `AdminAuditLog` with the actor `ops-cli`.
+
+If sign-up says the account is not active, `ops doctor` and `ops email-status` will say why: a `PREVIEW` status means `RESEND_API_KEY` is not set and nothing was delivered; a `FAILED` status carries Resend's own error, most often an unverified sending domain or an `EMAIL_FROM` still pointing at `example.com`.
+
 ## 20. Verify the deployment
 
 - [ ] `https://<domain>/api/health` returns `status: ok`

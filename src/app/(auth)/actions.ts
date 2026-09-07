@@ -43,6 +43,16 @@ export async function signUpAction(_prev: ActionResult | null, formData: FormDat
   try {
     const result = await auth.api.signUpEmail({ body: { name: parsed.data.name, email, password: parsed.data.password, callbackURL: "/app" }, headers: await headers() });
     await trackEvent({ name: "registration_completed", userId: result.user.id });
+    // Telling someone to check an inbox nothing was sent to leaves them stuck
+    // with no way to sign in, so report an undelivered verification honestly.
+    const delivered = await prisma.emailEvent.findFirst({
+      where: { toEmail: email, kind: "VERIFY_EMAIL" },
+      orderBy: { createdAt: "desc" },
+      select: { status: true },
+    });
+    if (delivered && delivered.status !== "SENT") {
+      return ok(undefined, "Your account was created, but we could not send the verification email, so it is not active yet. Please contact support and we will confirm it for you.");
+    }
     return ok(undefined, GENERIC_SIGNUP_MESSAGE);
   } catch (error) {
     if (error instanceof APIError && (error.body?.code === "USER_ALREADY_EXISTS" || error.status === 422)) {

@@ -4,6 +4,7 @@
 #   jobs     - run the cron job runner once and exit
 #   migrate  - apply pending Prisma migrations and exit
 #   seed     - load platform data once (plans, prompts, templates, flags)
+#   ops      - operator commands: doctor, email-status, verify-email, promote
 #
 # The bundles live in /app/jobs with the production node_modules beside them, so
 # both `require` and the dynamic `import()` inside the Prisma client resolve by
@@ -61,6 +62,10 @@ case "${1:-web}" in
     ;;
   seed)
     run_seed
+    ;;
+  ops)
+    shift
+    exec node /app/jobs/ops.js "$@"
     ;;
   *)
     exec "$@"

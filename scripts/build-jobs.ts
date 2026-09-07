@@ -31,12 +31,17 @@ async function main() {
     entryPoints: [path.resolve(__dirname, "../src/jobs/run.ts")],
     outfile: path.resolve(__dirname, "../dist/run.js"),
   });
-  // The seed is bundled too: tsx is a dev dependency and is pruned from the
-  // image, so `tsx prisma/seed.ts` cannot run inside a container.
+  // The seed and the operator commands are bundled too: tsx is a dev dependency
+  // and is pruned from the image, so nothing under scripts/ can run there.
   await build({
     ...common,
     entryPoints: [path.resolve(__dirname, "../src/lib/seed/cli.ts")],
     outfile: path.resolve(__dirname, "../dist/seed.js"),
+  });
+  await build({
+    ...common,
+    entryPoints: [path.resolve(__dirname, "../src/lib/ops/cli.ts")],
+    outfile: path.resolve(__dirname, "../dist/ops.js"),
   });
 }
 

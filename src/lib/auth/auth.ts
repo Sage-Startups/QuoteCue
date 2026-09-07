@@ -11,6 +11,19 @@ import { trackEvent } from "@/lib/services/app-events";
 
 const env = getEnv();
 
+/**
+ * A verification or reset email that is not delivered locks the account out:
+ * the user is told to check an inbox nothing will arrive in. Better Auth
+ * ignores the send outcome, so surface it in the logs with the fix.
+ */
+function warnIfUndelivered(kind: string, to: string, outcome: { status: string; error?: string; previewMode: boolean }): void {
+  if (outcome.status === "SENT") return;
+  const reason = outcome.previewMode
+    ? "the email provider is in preview mode (RESEND_API_KEY is not set), so nothing was delivered"
+    : `the provider rejected it: ${outcome.error ?? "unknown error"}`;
+  console.error(`[auth] ${kind} email to ${to} was not delivered - ${reason}. Run './docker/entrypoint.sh ops email-status' to inspect, or './docker/entrypoint.sh ops verify-email ${to}' to let this account in.`);
+}
+
 export const auth = betterAuth({
   appName: "QuoteCue AI",
   baseURL: env.BETTER_AUTH_URL ?? env.APP_URL,
@@ -46,12 +59,13 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 60 * 60,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
-      await sendEmail({
+      const outcome = await sendEmail({
         kind: "PASSWORD_RESET",
         to: user.email,
         userId: user.id,
         variables: { name: user.name || "there", resetUrl: url },
       });
+      warnIfUndelivered("password reset", user.email, outcome);
     },
   },
   emailVerification: {
@@ -59,12 +73,13 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60,
     sendVerificationEmail: async ({ user, url }) => {
-      await sendEmail({
+      const outcome = await sendEmail({
         kind: "VERIFY_EMAIL",
         to: user.email,
         userId: user.id,
         variables: { name: user.name || "there", verifyUrl: url },
       });
+      warnIfUndelivered("verification", user.email, outcome);
     },
     afterEmailVerification: async (user) => {
       await trackEvent({ name: "email_verified", userId: user.id });

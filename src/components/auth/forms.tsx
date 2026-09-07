@@ -17,8 +17,11 @@ export function SignUpForm() {
   const [state, action, pending] = useActionState(signUpAction, null);
   const err = useErrors(state);
   if (state?.ok) {
+    // The action reports an undelivered verification email rather than telling
+    // someone to check an inbox that will never receive anything.
+    const delivered = !state.message?.includes("could not send");
     return (
-      <Alert variant="success" title="Check your email">
+      <Alert variant={delivered ? "success" : "warning"} title={delivered ? "Check your email" : "Account created, but not yet active"}>
         {state.message}
       </Alert>
     );
