@@ -56,8 +56,25 @@ export function useUploader(options: { purpose: UploadPurpose; quoteId?: string;
           xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) update(id, { progress: Math.round((e.loaded / e.total) * 100) });
           };
-          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Storage rejected the upload (${xhr.status})`)));
-          xhr.onerror = () => reject(new Error("Network error during upload"));
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) return resolve();
+            if (xhr.status === 403) return reject(new Error("The storage bucket rejected the upload as unauthorised (403). The upload link may have expired, or the bucket credentials may not allow writing."));
+            reject(new Error(`The storage bucket rejected the upload (HTTP ${xhr.status}).`));
+          };
+          // A blocked cross-origin request reaches onerror with no status at
+          // all, which is almost always the bucket's CORS policy rather than a
+          // real network fault. Say so: "network error" sends people hunting
+          // for the wrong problem.
+          xhr.onerror = () => {
+            const host = (() => {
+              try {
+                return new URL(presignBody.url).host;
+              } catch {
+                return "the storage bucket";
+              }
+            })();
+            reject(new Error(`Could not reach ${host}. This is usually the bucket's CORS policy: it has to allow PUT from ${window.location.origin}. The site owner can apply it with the storage-cors operator command.`));
+          };
           xhr.onabort = () => reject(new Error("Upload cancelled"));
           xhr.send(file);
         });

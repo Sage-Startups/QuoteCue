@@ -17,6 +17,7 @@ const USAGE = `Usage: ops <command>
   promote <email> [role]     Set a platform role: SUPER_ADMIN (default), SUPPORT_ADMIN, USER
   storage-check              Upload, read and delete a test object to prove the bucket works
   storage-cors [origin]      Allow browser uploads from this site (defaults to APP_URL)
+  storage-cors show          Print the current CORS policy without changing it
 `;
 
 async function doctor(): Promise<void> {
@@ -159,6 +160,16 @@ async function storageCors(originArg?: string): Promise<void> {
   const env = getEnv();
   const missing = missingStorageCredentials(env);
   if (missing.length > 0) throw new Error(`Object storage is not configured: set ${missing.join(", ")} and redeploy.`);
+  const storageForRead = getStorage() as unknown as { getCorsPolicy?(): Promise<Array<{ origins: string[]; methods: string[] }>> };
+  if (originArg === "show") {
+    const current = await storageForRead.getCorsPolicy?.().catch((error: unknown) => {
+      console.log(`Could not read the policy back: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    });
+    if (!current || current.length === 0) console.log("No CORS policy is set on this bucket, so browser uploads are blocked.");
+    else for (const rule of current) console.log(`  ${rule.methods.join(", ")} from ${rule.origins.join(", ")}`);
+    return;
+  }
   const origin = (originArg ?? env.APP_URL).replace(/\/$/, "");
   if (!/^https?:\/\//.test(origin)) throw new Error(`Origin must start with http:// or https:// - got "${origin}"`);
   const storage = getStorage();
