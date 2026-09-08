@@ -17,7 +17,29 @@ All user files (job photographs, voice notes, documents, logos, generated quote 
 
 The interface (`types.ts`) is deliberately small: `putObject`, `getObject`, `headObject`, `deleteObject`, `createPresignedUpload`, `createPresignedDownload` and `healthCheck`.
 
-### Railway bucket configuration
+### The bucket must allow browser uploads (CORS)
+
+Files go straight from the browser to the bucket with a presigned `PUT`, so the bucket needs a CORS policy naming the site's origin. Without one the browser blocks the request before it leaves, the upload fails with a bare network error, and nothing appears in the bucket's own logs. This is the most common reason uploads fail on a correctly credentialled deployment.
+
+Allow the site origin, the `PUT`, `GET` and `HEAD` methods, and any request headers:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://yourdomain.com"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+On Cloudflare R2 this is the bucket's Settings, CORS policy. On Railway's storage bucket and on AWS S3 it is the bucket CORS configuration. Add every origin the app is served from, including a staging domain if you have one. A wildcard origin works but is worth avoiding on a bucket holding customer photographs.
+
+The application's own Content Security Policy already permits uploads to any `https:` origin, so no change is needed there for a normal deployment.
+
+## Railway bucket configuration
 
 Railway exposes the bucket's credentials as service variables. Map them onto the application's names (this is the mapping in `.env.example`):
 

@@ -122,12 +122,28 @@ To run against a server that is already up (Next.js refuses to start a second `n
 | `journey.spec.ts` (serial) | Registration → onboarding → dashboard; create a customer; the full seven-step wizard from a pasted message with photo and voice-note uploads, AI analysis, pricing, wording, PDF preview and sending; the customer opens the secure link in a separate browser context (quote becomes *Viewed*) and accepts; mock Stripe checkout upgrades the plan; a promoted super admin reaches the console and manages users and workspaces; a second user cannot open `/super-admin` or the first workspace's quote; password reset revokes sessions and signs in again |
 | `responsive.spec.ts` | Landing page fits each viewport without horizontal overflow and has labelled navigation; demo dashboard and quote list adapt; forms have labels and visible keyboard focus; empty and error states render |
 | `mobile.spec.ts` | Creates a quote end to end from a phone-sized viewport |
+| `media.spec.ts` | Photograph and audio-file upload, automatic transcription, both reaching the analysis, and a genuine microphone recording via MediaRecorder. Needs an S3-compatible endpoint (see below) |
+| `no-storage.spec.ts` | With no bucket configured the wizard states that uploads are unavailable, offers no upload controls, and the typed enquiry still analyses. Run with `STORAGE_PROVIDER=railway` and no credentials |
 
 `tests/e2e/helpers.ts` provides `registerAndVerify(page, name?, plan?)`, `signIn`, `completeOnboarding`, `latestEmailLink`, `promoteToSuperAdmin` and `noHorizontalOverflow`. Despite its name, `registerAndVerify` no longer reads a verification email: it fills in the sign-up form, optionally ticks the `STARTER` or `PRO` plan card when a plan is passed, submits and waits for `/onboarding` or `/app`. It also clears the registration rate-limit window for the loopback address first, so repeated runs do not trip the production limit of five sign-ups per ten minutes. `latestEmailLink` is still used for password-reset and magic links.
 
 ### Screenshots
 
 The journey and responsive specs write the screenshots used in the listing to `docs/screenshots/`: `landing-desktop.png`, `landing-mobile.png`, `dashboard.png`, `new-quote-wizard.png`, `ai-analysis.png`, `quote-preview.png`, `customer-acceptance.png` and `super-admin-overview.png`. Re-run the suite to refresh them after UI changes. Failure artefacts (traces, screenshots, `error-context.md`) go to `test-results/` and the HTML report to `playwright-report/`; both directories are git-ignored.
+
+
+### Exercising the S3 storage path
+
+`media.spec.ts` covers the storage provider production actually uses, which the other specs do not: they run on local-disk storage, where a bug in presigning, CORS or the S3 client cannot show up. Point the app at any S3-compatible endpoint before running it, for example a bucket in a test account, or a local stub that accepts presigned `PUT`, `GET`, `HEAD` and `DELETE` and returns CORS headers:
+
+```bash
+STORAGE_PROVIDER=s3 STORAGE_BUCKET=quotecue-test \
+  STORAGE_ENDPOINT=http://localhost:9100 STORAGE_REGION=us-east-1 \
+  STORAGE_ACCESS_KEY_ID=test-key STORAGE_SECRET_ACCESS_KEY=test-secret \
+  STORAGE_FORCE_PATH_STYLE=true pnpm dev
+```
+
+Chromium is launched with `--use-fake-device-for-media-stream`, so `MediaRecorder` records a synthetic tone and the voice-note path runs headless. Note that the browser blocks uploads to an endpoint the Content Security Policy does not allow: in development that means `localhost` or `127.0.0.1`, and in production any `https:` origin.
 
 ## Static checks
 

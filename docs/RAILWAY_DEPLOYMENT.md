@@ -46,7 +46,7 @@ STORAGE_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
 STORAGE_FORCE_PATH_STYLE=true
 ```
 
-Replace `Bucket` with the bucket service's name. See [STORAGE.md](STORAGE.md).
+Replace `Bucket` with the bucket service's name. **Then set a CORS policy on the bucket allowing `PUT`, `GET` and `HEAD` from your site's origin**: uploads go straight from the browser to the bucket, and without CORS every upload fails with a bare network error. See [STORAGE.md](STORAGE.md). See [STORAGE.md](STORAGE.md).
 
 ## 7. Authentication variables
 

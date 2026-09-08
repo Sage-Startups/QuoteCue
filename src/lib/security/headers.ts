@@ -9,7 +9,7 @@ export function buildContentSecurityPolicy(nonce: string, options: { allowStripe
   if (options.allowStripe) scriptSrc.push("https://js.stripe.com", "https://checkout.stripe.com");
 
   const connectSrc = ["'self'", "https://api.stripe.com", "https://checkout.stripe.com"];
-  if (options.isDev) connectSrc.push("ws://localhost:*", "http://localhost:*");
+  if (options.isDev) connectSrc.push("ws://localhost:*", "http://localhost:*", "ws://127.0.0.1:*", "http://127.0.0.1:*");
   // Presigned uploads go straight to the storage bucket from the browser.
   connectSrc.push("https:");
 

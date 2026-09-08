@@ -126,6 +126,7 @@ export default async function QuoteEditPage({ params, searchParams }: { params: 
     limits: { maxImageMb: site["app.maxImageMb"], maxAudioMb: site["app.maxAudioMb"], maxDocumentMb: site["app.maxDocumentMb"], maxImages: site["app.maxImagesPerQuote"], imageTypes: site["app.allowedImageTypes"], audioTypes: site["app.allowedAudioTypes"], documentTypes: site["app.allowedDocumentTypes"] },
     aiProvider: env.providers.ai,
     emailPreviewMode: env.providers.email === "preview",
+    uploadsAvailable: env.storageConfigured,
   };
   const document = step === 6 ? await buildQuoteDocument(ctx.workspace.id, quote.id) : null;
   const publicUrl = step === 7 && ["SENT", "VIEWED"].includes(quote.status) ? (await ensurePublicLink(ctx.workspace.id, quote.id)).url : null;

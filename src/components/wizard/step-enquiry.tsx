@@ -114,7 +114,12 @@ export function StepEnquiry({ data }: { data: WizardData }) {
           </Field>
         </CardContent>
       </Card>
-      {data.flags.voice ? (
+      {!data.uploadsAvailable ? (
+        <Alert variant="warning" title="File uploads are unavailable">
+          This site has no file storage configured, so voice notes, photographs and documents cannot be attached. Typed enquiry details and job notes still work, and the AI analysis runs on those. The site owner can enable uploads by configuring a storage bucket.
+        </Alert>
+      ) : null}
+      {data.flags.voice && data.uploadsAvailable ? (
         <Card>
           <CardHeader>
             <CardTitle>Voice note</CardTitle>
@@ -143,6 +148,7 @@ export function StepEnquiry({ data }: { data: WizardData }) {
           </CardContent>
         </Card>
       ) : null}
+      {data.uploadsAvailable ? (
       <Card>
         <CardHeader>
           <CardTitle>Job photographs</CardTitle>
@@ -164,6 +170,8 @@ export function StepEnquiry({ data }: { data: WizardData }) {
           <MediaGrid media={media.filter((m) => m.kind === "IMAGE")} onRemove={remove} pending={pending} />
         </CardContent>
       </Card>
+      ) : null}
+      {data.uploadsAvailable ? (
       <Card>
         <CardHeader>
           <CardTitle>Supporting documents</CardTitle>
@@ -188,6 +196,7 @@ export function StepEnquiry({ data }: { data: WizardData }) {
           <MediaList media={media.filter((m) => m.kind !== "IMAGE")} onRemove={remove} onTranscribe={transcribe} transcribing={transcribing} pending={pending} />
         </CardContent>
       </Card>
+      ) : null}
       {activeUploads.length > 0 ? (
         <div className="space-y-2" aria-live="polite">
           {activeUploads.map((u) => (

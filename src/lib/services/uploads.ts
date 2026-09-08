@@ -3,6 +3,7 @@ import type { UploadPurpose } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { getStorage, buildObjectKey, extensionForMime } from "@/lib/storage";
+import { getEnv, missingStorageCredentials } from "@/lib/env";
 import { AppError, NotFoundError } from "@/lib/utils/result";
 
 const PRESIGN_TTL_SECONDS = 300;
@@ -64,6 +65,14 @@ export async function createPresignedUpload(input: PresignInput) {
     if (!quote) throw new NotFoundError("Quote not found");
   }
   const key = buildObjectKey(input.purpose, input.workspaceId ?? input.userId, mime);
+  // Without bucket credentials getStorage() throws a plain Error, which reaches
+  // the user as "Something went wrong". Say what is actually wrong instead, and
+  // log the specific variables for whoever runs the site.
+  const missingStorage = missingStorageCredentials(getEnv());
+  if (missingStorage.length > 0) {
+    console.error(`[uploads] refused: object storage is not configured (missing ${missingStorage.join(", ")}). Set them on the service and redeploy.`);
+    throw new AppError("File uploads are not available on this site yet, because its file storage has not been set up. Everything else in the quote still works.", { status: 503, code: "STORAGE_NOT_CONFIGURED" });
+  }
   const storage = getStorage();
   const presigned = await storage.createPresignedUpload(key, mime, PRESIGN_TTL_SECONDS);
   const upload = await prisma.upload.create({

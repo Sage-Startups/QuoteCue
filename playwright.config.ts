@@ -20,7 +20,11 @@ export default defineConfig({
     screenshot: "only-on-failure",
     locale: "en-GB",
     timezoneId: "Europe/London",
-    launchOptions: executablePath ? { executablePath } : undefined,
+    launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
+      // A synthetic microphone so MediaRecorder works headless in the voice-note test.
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /mobile\.spec\.ts/ },

@@ -107,6 +107,8 @@ export interface WizardData {
   limits: { maxImageMb: number; maxAudioMb: number; maxDocumentMb: number; maxImages: number; imageTypes: string[]; audioTypes: string[]; documentTypes: string[] };
   aiProvider: "openai" | "mock";
   emailPreviewMode: boolean;
+  /** False when the site has no object storage configured: uploads cannot work. */
+  uploadsAvailable: boolean;
 }
 
 export const WIZARD_STEPS = [
