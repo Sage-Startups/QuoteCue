@@ -2,6 +2,10 @@ import type { MetadataRoute } from "next";
 import { getEnv } from "@/lib/env";
 import { isDemoAvailable } from "@/lib/services/demo";
 
+// Rendered per request: the demo check reads the database, which does not exist
+// during the container build, and a statically prerendered sitemap would fail it.
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = getEnv().APP_URL;
   const now = new Date();
@@ -21,6 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ["/login", 0.4, "yearly"],
   ];
   // Only list the demo once it can actually be opened.
-  if (await isDemoAvailable()) routes.splice(5, 0, ["/demo", 0.8, "monthly"]);
+  // A database blip must not take the sitemap down; omit the demo entry instead.
+  if (await isDemoAvailable().catch(() => false)) routes.splice(5, 0, ["/demo", 0.8, "monthly"]);
   return routes.map(([path, priority, changeFrequency]) => ({ url: `${base}${path}`, lastModified: now, changeFrequency, priority }));
 }

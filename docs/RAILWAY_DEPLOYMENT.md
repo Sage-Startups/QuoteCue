@@ -46,7 +46,21 @@ STORAGE_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
 STORAGE_FORCE_PATH_STYLE=true
 ```
 
-Replace `Bucket` with the bucket service's name. **Then set a CORS policy on the bucket allowing `PUT`, `GET` and `HEAD` from your site's origin**: uploads go straight from the browser to the bucket, and without CORS every upload fails with a bare network error. See [STORAGE.md](STORAGE.md). See [STORAGE.md](STORAGE.md).
+Replace `Bucket` with the bucket service's name.
+
+**Then allow browser uploads.** Files go straight from the browser to the bucket, so the bucket needs a CORS policy naming your site. Without it every upload fails with a bare network error and nothing reaches the bucket's logs. Once the variables above are set, run this as a one-off command on the service:
+
+```
+./docker/entrypoint.sh ops storage-cors
+```
+
+It applies the policy to your own bucket using the credentials already in the environment, defaulting to `APP_URL` as the allowed origin (pass a different origin as an argument if you need one). To confirm the credentials work at all:
+
+```
+./docker/entrypoint.sh ops storage-check
+```
+
+Some providers only accept CORS through their own dashboard; if the command reports that the bucket refused the policy, it prints exactly what to set by hand. See [STORAGE.md](STORAGE.md). See [STORAGE.md](STORAGE.md).
 
 ## 7. Authentication variables
 

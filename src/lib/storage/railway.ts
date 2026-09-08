@@ -1,5 +1,7 @@
 import {
   DeleteObjectCommand,
+  GetBucketCorsCommand,
+  PutBucketCorsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -40,6 +42,37 @@ export class RailwayBucketStorage implements StorageProvider {
         secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY!,
       },
     });
+  }
+
+
+  /**
+   * Applies the CORS policy browsers need for presigned uploads. Files go
+   * straight from the browser to the bucket, so without this every upload is
+   * blocked before it leaves and nothing reaches the bucket's own logs.
+   */
+  async putCorsPolicy(origins: string[]): Promise<void> {
+    await this.client.send(
+      new PutBucketCorsCommand({
+        Bucket: this.bucket,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedOrigins: origins,
+              AllowedMethods: ["GET", "PUT", "HEAD"],
+              AllowedHeaders: ["*"],
+              ExposeHeaders: ["ETag"],
+              MaxAgeSeconds: 86_400,
+            },
+          ],
+        },
+      }),
+    );
+  }
+
+  /** Reads the bucket's CORS policy back, so an operator can confirm it applied. */
+  async getCorsPolicy(): Promise<Array<{ origins: string[]; methods: string[] }>> {
+    const result = await this.client.send(new GetBucketCorsCommand({ Bucket: this.bucket }));
+    return (result.CORSRules ?? []).map((rule) => ({ origins: rule.AllowedOrigins ?? [], methods: rule.AllowedMethods ?? [] }));
   }
 
   async putObject(key: string, body: Buffer, contentType: string): Promise<void> {

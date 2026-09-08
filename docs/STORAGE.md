@@ -35,7 +35,15 @@ Allow the site origin, the `PUT`, `GET` and `HEAD` methods, and any request head
 ]
 ```
 
-On Cloudflare R2 this is the bucket's Settings, CORS policy. On Railway's storage bucket and on AWS S3 it is the bucket CORS configuration. Add every origin the app is served from, including a staging domain if you have one. A wildcard origin works but is worth avoiding on a bucket holding customer photographs.
+The application can set this for you, using the credentials it already has:
+
+```
+./docker/entrypoint.sh ops storage-cors                       # allows APP_URL
+./docker/entrypoint.sh ops storage-cors https://staging.example.com
+./docker/entrypoint.sh ops storage-check                      # write, read and delete a test object
+```
+
+Otherwise set it in the provider's dashboard. On Cloudflare R2 this is the bucket's Settings, CORS policy. On Railway's storage bucket and on AWS S3 it is the bucket CORS configuration. Add every origin the app is served from, including a staging domain if you have one. A wildcard origin works but is worth avoiding on a bucket holding customer photographs.
 
 The application's own Content Security Policy already permits uploads to any `https:` origin, so no change is needed there for a normal deployment.
 
