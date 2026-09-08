@@ -36,7 +36,12 @@ export class RailwayBucketStorage implements StorageProvider {
     this.client = new S3Client({
       region: env.STORAGE_REGION!,
       endpoint: env.STORAGE_ENDPOINT!,
-      forcePathStyle: env.STORAGE_FORCE_PATH_STYLE ?? true,
+      // Virtual-hosted addressing by default, which is what Railway Buckets and
+      // R2 expect. Set STORAGE_FORCE_PATH_STYLE=true for self-hosted MinIO or
+      // Garage, which usually need path style. (The previous `?? true` never
+      // applied: the env parser always yields a boolean, so the effective
+      // default was already false.)
+      forcePathStyle: env.STORAGE_FORCE_PATH_STYLE,
       credentials: {
         accessKeyId: env.STORAGE_ACCESS_KEY_ID!,
         secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY!,

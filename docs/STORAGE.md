@@ -17,7 +17,21 @@ All user files (job photographs, voice notes, documents, logos, generated quote 
 
 The interface (`types.ts`) is deliberately small: `putObject`, `getObject`, `headObject`, `deleteObject`, `createPresignedUpload`, `createPresignedDownload` and `healthCheck`.
 
-### The bucket must allow browser uploads (CORS)
+### Railway Buckets
+
+A Railway Bucket presents its credentials with AWS names. Map them onto this application's variables:
+
+| Railway shows | Set here |
+| --- | --- |
+| `AWS_S3_BUCKET_NAME` | `STORAGE_BUCKET` |
+| `AWS_ENDPOINT_URL` | `STORAGE_ENDPOINT` |
+| `AWS_ACCESS_KEY_ID` | `STORAGE_ACCESS_KEY_ID` |
+| `AWS_SECRET_ACCESS_KEY` | `STORAGE_SECRET_ACCESS_KEY` |
+| `AWS_DEFAULT_REGION` (usually `auto`) | `STORAGE_REGION` |
+
+with `STORAGE_PROVIDER=railway`, and leave `STORAGE_FORCE_PATH_STYLE` unset: Railway uses virtual-hosted addressing. `railway bucket credentials` prints these values from the CLI.
+
+## The bucket must allow browser uploads (CORS)
 
 Files go straight from the browser to the bucket with a presigned `PUT`, so the bucket needs a CORS policy naming the site's origin. Without one the browser blocks the request before it leaves, the upload fails with a bare network error, and nothing appears in the bucket's own logs. This is the most common reason uploads fail on a correctly credentialled deployment.
 
@@ -35,7 +49,7 @@ Allow the site origin, the `PUT`, `GET` and `HEAD` methods, and any request head
 ]
 ```
 
-The application can set this for you, using the credentials it already has:
+Railway Buckets have no CORS panel in the dashboard, so this must be done through the S3 API. The application can do it for you, using the credentials it already has:
 
 ```
 ./docker/entrypoint.sh ops storage-cors                       # allows APP_URL
@@ -66,10 +80,9 @@ STORAGE_ENDPOINT=${{Bucket.ENDPOINT}}
 STORAGE_REGION=${{Bucket.REGION}}
 STORAGE_ACCESS_KEY_ID=${{Bucket.ACCESS_KEY_ID}}
 STORAGE_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
-STORAGE_FORCE_PATH_STYLE=true
 ```
 
-(`Bucket` is whatever you named the bucket service in Railway.) The S3 client is created with `forcePathStyle` set from `STORAGE_FORCE_PATH_STYLE` (defaults to `true` when unset) and the endpoint/region/credentials above. `healthCheck()` sends `HeadBucket` and is reported by `/api/health/system`.
+(`Bucket` is whatever you named the bucket service in Railway.) The S3 client is created with `forcePathStyle` set from `STORAGE_FORCE_PATH_STYLE`, which defaults to false (virtual-hosted addressing, what Railway Buckets and R2 use). Set it to `true` only for self-hosted MinIO or Garage. The endpoint, region and credentials come from the variables above. `healthCheck()` sends `HeadBucket` and is reported by `/api/health/system`.
 
 ### Local development
 

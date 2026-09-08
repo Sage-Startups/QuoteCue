@@ -14,7 +14,7 @@ Add a **PostgreSQL** database service. Railway provisions PostgreSQL and exposes
 
 ## 3. Add a private Storage Bucket
 
-Add a **Storage Bucket** service (Railway's S3-compatible object storage). Keep it private (no public access). The bucket service exposes `BUCKET`, `ENDPOINT`, `REGION`, `ACCESS_KEY_ID` and `SECRET_ACCESS_KEY`; check the exact names in the bucket's Variables tab.
+Add a **Storage Bucket** service (Railway's S3-compatible object storage). Keep it private (no public access). Railway Buckets are private and S3-compatible. Their credentials are shown on the bucket's Credentials tab, and by `railway bucket credentials` in the CLI, in AWS naming: `AWS_S3_BUCKET_NAME`, `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`. Map them onto this application's `STORAGE_*` names in step 6.
 
 ## 4. Add the application from GitHub
 
@@ -43,7 +43,6 @@ STORAGE_ENDPOINT=${{Bucket.ENDPOINT}}
 STORAGE_REGION=${{Bucket.REGION}}
 STORAGE_ACCESS_KEY_ID=${{Bucket.ACCESS_KEY_ID}}
 STORAGE_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
-STORAGE_FORCE_PATH_STYLE=true
 ```
 
 Replace `Bucket` with the bucket service's name.
@@ -265,7 +264,7 @@ If an email does not arrive (the welcome email at sign-up, a password reset, a q
 | `SUPER_ADMIN_EMAIL` | no | Promoted by `pnpm db:seed` if the account exists |
 | `STORAGE_PROVIDER` | yes (`railway` or `s3`) | Storage implementation |
 | `STORAGE_BUCKET`, `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | needed for uploads | Bucket credentials (mapped from the bucket service). Missing values no longer stop the app from starting: it logs a warning at boot and only file uploads and downloads fail, so you can deploy first and attach a bucket afterwards |
-| `STORAGE_FORCE_PATH_STYLE` | no (default true) | Path-style S3 addressing |
+| `STORAGE_FORCE_PATH_STYLE` | no (default false) | Leave unset for Railway Buckets and R2, which use virtual-hosted addressing. Set to `true` for self-hosted MinIO or Garage |
 | `LOCAL_STORAGE_PATH` | no | Development only |
 | `STRIPE_SECRET_KEY` | yes | Live (or test) secret key |
 | `STRIPE_WEBHOOK_SECRET` | yes | Endpoint signing secret |
