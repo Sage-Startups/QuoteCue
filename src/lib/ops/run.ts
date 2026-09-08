@@ -88,6 +88,45 @@ async function promote(email?: string, role = "SUPER_ADMIN"): Promise<void> {
 }
 
 
+/**
+ * Describes a credential without printing it: enough to compare against what
+ * the provider shows, plus the paste mistakes that produce a valid-looking but
+ * wrong value (surrounding quotes, stray whitespace, an unresolved Railway
+ * variable reference).
+ */
+function describeSecret(value: string | undefined, hideEdges = false): string {
+  if (!value) return "(not set)";
+  const notes: string[] = [];
+  if (/^["']|["']$/.test(value)) notes.push("has surrounding quotes - remove them");
+  if (value !== value.trim()) notes.push("has leading or trailing whitespace - remove it");
+  if (/\s/.test(value.trim())) notes.push("contains a space or newline");
+  if (value.includes("${{")) notes.push("is an unresolved Railway variable reference - the service or variable name is wrong");
+  const shape = hideEdges ? `${value.length} chars` : `${value.slice(0, 4)}...${value.slice(-4)} (${value.length} chars)`;
+  return notes.length > 0 ? `${shape}  <-- ${notes.join("; ")}` : shape;
+}
+
+/** Turns an S3 error into the thing the operator actually has to change. */
+function explainStorageFailure(error: unknown, env: { STORAGE_ENDPOINT?: string; STORAGE_BUCKET?: string }): string {
+  const name = (error as { name?: string })?.name ?? "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === "InvalidAccessKeyId" || /access key id you provided does not exist/i.test(message)) {
+    return `${message}\n\nThe bucket and endpoint are right, so the access key is the problem. Open the bucket's Credentials tab (or run \`railway bucket credentials\`) and copy the pair again, checking above for quotes or whitespace. Note that resetting credentials invalidates the previous pair, and that a key from a different bucket will not work here.`;
+  }
+  if (name === "SignatureDoesNotMatch") {
+    return `${message}\n\nThe access key is recognised but the secret does not match it. Copy STORAGE_SECRET_ACCESS_KEY again from the same credentials pair.`;
+  }
+  if (name === "NoSuchBucket") {
+    return `${message}\n\nThe credentials work but no bucket named "${env.STORAGE_BUCKET}" exists at ${env.STORAGE_ENDPOINT}. Check STORAGE_BUCKET against the provider.`;
+  }
+  if (name === "AccessDenied") {
+    return `${message}\n\nThe credentials are valid but not allowed to write here. Reissue them with object read and write permission on this bucket.`;
+  }
+  if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|certificate/i.test(message)) {
+    return `${message}\n\nThe endpoint ${env.STORAGE_ENDPOINT} could not be reached. Check STORAGE_ENDPOINT includes https:// and is the S3 API endpoint, not a public file URL.`;
+  }
+  return message;
+}
+
 /** Proves the bucket credentials and connectivity with a real round trip. */
 async function storageCheck(): Promise<void> {
   const env = getEnv();
@@ -98,12 +137,20 @@ async function storageCheck(): Promise<void> {
   const body = Buffer.from("QuoteCue storage check");
   console.log(`Bucket   ${env.STORAGE_BUCKET}`);
   console.log(`Endpoint ${env.STORAGE_ENDPOINT}`);
-  await storage.putObject(key, body, "text/plain");
-  console.log("  write   ok");
-  const head = await storage.headObject(key);
-  console.log(`  read    ok (${head?.sizeBytes ?? 0} bytes)`);
-  await storage.deleteObject(key);
-  console.log("  delete  ok");
+  console.log(`Region   ${env.STORAGE_REGION}`);
+  console.log(`Key id   ${describeSecret(env.STORAGE_ACCESS_KEY_ID)}`);
+  console.log(`Secret   ${describeSecret(env.STORAGE_SECRET_ACCESS_KEY, true)}`);
+  try {
+    await storage.putObject(key, body, "text/plain");
+    console.log("  write   ok");
+    const head = await storage.headObject(key);
+    console.log(`  read    ok (${head?.sizeBytes ?? 0} bytes)`);
+    await storage.deleteObject(key);
+    console.log("  delete  ok");
+  } catch (error) {
+    console.log("  write   FAILED");
+    throw new Error(explainStorageFailure(error, env));
+  }
   console.log("\nThe bucket accepts writes from the server. If uploads still fail in the browser, it is the CORS policy: run `ops storage-cors`.");
 }
 
