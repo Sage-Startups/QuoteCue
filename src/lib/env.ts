@@ -37,6 +37,10 @@ const envSchema = z.object({
   STORAGE_ACCESS_KEY_ID: optionalString,
   STORAGE_SECRET_ACCESS_KEY: optionalString,
   STORAGE_FORCE_PATH_STYLE: booleanish,
+  // Extra browser origins allowed to upload straight to the bucket, comma
+  // separated. APP_URL is always allowed; this is for sites reachable on more
+  // than one domain.
+  STORAGE_CORS_ORIGINS: optionalString,
   LOCAL_STORAGE_PATH: z.string().default(".local-storage"),
 
   STRIPE_SECRET_KEY: optionalString,

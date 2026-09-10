@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       if (ws.supportSession) return NextResponse.json({ error: "Support mode is read-only" }, { status: 403 });
       workspaceId = ws.workspace.id;
     }
-    const result = await createPresignedUpload({ workspaceId, userId: session.user.id, purpose: input.purpose, filename: input.filename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, quoteId: input.quoteId ?? null });
+    const result = await createPresignedUpload({ workspaceId, userId: session.user.id, purpose: input.purpose, filename: input.filename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, quoteId: input.quoteId ?? null, requestOrigin: request.headers.get("origin") });
     return NextResponse.json(result);
   } catch (error) {
     const status = error instanceof AppError ? error.status : 500;

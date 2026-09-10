@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getEnv, missingStorageCredentials } from "@/lib/env";
 import { getStorage } from "@/lib/storage";
+import { corsAllowsOrigin, supportsCors, uploadOrigins } from "@/lib/storage/cors";
 
 /**
  * Operator commands that run inside the container. The equivalents under
@@ -36,6 +37,7 @@ async function doctor(): Promise<void> {
   }
   console.log(`  APP_URL     ${env.APP_URL}`);
   console.log("");
+  await reportCors(env);
   const [users, verified, workspaces, plans] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { emailVerified: true } }),
@@ -44,6 +46,23 @@ async function doctor(): Promise<void> {
   ]);
   console.log(`Data: ${users} users (${verified} verified), ${workspaces} workspaces, ${plans} plans`);
   if (plans === 0) console.log("  WARNING: no plans. Run `./docker/entrypoint.sh seed`.");
+}
+
+/** Browser uploads are blocked without this, and nothing else reveals it. */
+async function reportCors(env: ReturnType<typeof getEnv>): Promise<void> {
+  if (missingStorageCredentials(env).length > 0) return;
+  const storage = getStorage();
+  if (!supportsCors(storage)) return;
+  console.log("Bucket CORS (browser uploads)");
+  const rules = await storage.getCorsPolicy().catch((error: unknown) => {
+    console.log(`  could not read the policy: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  });
+  if (!rules) return;
+  for (const origin of uploadOrigins(env)) {
+    console.log(corsAllowsOrigin(rules, origin) ? `  ${origin}  allowed` : `  ${origin}  BLOCKED - uploads from here fail; run \`ops storage-cors\``);
+  }
+  console.log("");
 }
 
 async function emailStatus(countArg?: string): Promise<void> {
@@ -152,7 +171,7 @@ async function storageCheck(): Promise<void> {
     console.log("  write   FAILED");
     throw new Error(explainStorageFailure(error, env));
   }
-  console.log("\nThe bucket accepts writes from the server. If uploads still fail in the browser, it is the CORS policy: run `ops storage-cors`.");
+  console.log("\nThe bucket accepts writes from the server. If uploads still fail in the browser, it is the CORS policy: run `ops storage-cors show`.");
 }
 
 /** Applies the CORS policy that presigned browser uploads require. */
@@ -160,32 +179,38 @@ async function storageCors(originArg?: string): Promise<void> {
   const env = getEnv();
   const missing = missingStorageCredentials(env);
   if (missing.length > 0) throw new Error(`Object storage is not configured: set ${missing.join(", ")} and redeploy.`);
-  const storageForRead = getStorage() as unknown as { getCorsPolicy?(): Promise<Array<{ origins: string[]; methods: string[] }>> };
+  const storage = getStorage();
+  if (!supportsCors(storage)) throw new Error("The configured storage provider does not support CORS configuration.");
+
   if (originArg === "show") {
-    const current = await storageForRead.getCorsPolicy?.().catch((error: unknown) => {
+    const current = await storage.getCorsPolicy().catch((error: unknown) => {
       console.log(`Could not read the policy back: ${error instanceof Error ? error.message : String(error)}`);
       return [];
     });
-    if (!current || current.length === 0) console.log("No CORS policy is set on this bucket, so browser uploads are blocked.");
+    if (current.length === 0) console.log("No CORS policy is set on this bucket, so browser uploads are blocked.");
     else for (const rule of current) console.log(`  ${rule.methods.join(", ")} from ${rule.origins.join(", ")}`);
+    for (const origin of uploadOrigins(env)) {
+      console.log(corsAllowsOrigin(current, origin) ? `  ${origin}: allowed` : `  ${origin}: NOT allowed, so uploads from it are blocked`);
+    }
     return;
   }
-  const origin = (originArg ?? env.APP_URL).replace(/\/$/, "");
-  if (!/^https?:\/\//.test(origin)) throw new Error(`Origin must start with http:// or https:// - got "${origin}"`);
-  const storage = getStorage();
-  if (!("putCorsPolicy" in storage) || typeof (storage as { putCorsPolicy?: unknown }).putCorsPolicy !== "function") {
-    throw new Error("The configured storage provider does not support CORS configuration.");
+
+  // The app applies this itself on the first upload after a deploy, so this
+  // command is for forcing it now or for an origin the app does not know about.
+  const origins = originArg ? [originArg.replace(/\/$/, "")] : uploadOrigins(env);
+  if (origins.length === 0) throw new Error("No origin to allow: set APP_URL to the address people browse the site on.");
+  for (const origin of origins) {
+    if (!/^https?:\/\//.test(origin)) throw new Error(`Origin must start with http:// or https:// - got "${origin}"`);
   }
-  const bucket = storage as unknown as { putCorsPolicy(origins: string[]): Promise<void>; getCorsPolicy(): Promise<Array<{ origins: string[]; methods: string[] }>> };
-  console.log(`Allowing browser uploads from ${origin} ...`);
+  console.log(`Allowing browser uploads from ${origins.join(", ")} ...`);
   try {
-    await bucket.putCorsPolicy([origin]);
+    await storage.putCorsPolicy(origins);
   } catch (error) {
     // Some providers only accept CORS through their own dashboard.
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`The bucket refused the CORS policy: ${message}\n\nSet it in your storage provider's dashboard instead. Allow origin ${origin}, methods GET, PUT and HEAD, all request headers, and expose ETag.`);
+    throw new Error(`The bucket refused the CORS policy: ${message}\n\nSet it in your storage provider's dashboard instead. Allow origin ${origins.join(", ")}, methods GET, PUT and HEAD, all request headers, and expose ETag.`);
   }
-  const rules = await bucket.getCorsPolicy().catch(() => []);
+  const rules = await storage.getCorsPolicy().catch(() => []);
   if (rules.length > 0) {
     for (const rule of rules) console.log(`  applied: ${rule.methods.join(", ")} from ${rule.origins.join(", ")}`);
   } else {

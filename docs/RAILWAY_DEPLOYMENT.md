@@ -47,19 +47,17 @@ STORAGE_SECRET_ACCESS_KEY=${{Bucket.SECRET_ACCESS_KEY}}
 
 Replace `Bucket` with the bucket service's name.
 
-**Then allow browser uploads.** Files go straight from the browser to the bucket, so the bucket needs a CORS policy naming your site. Without it every upload fails with a bare network error and nothing reaches the bucket's logs. Once the variables above are set, run this as a one-off command on the service:
+**Browser uploads need one more thing, and the app does it for you.** Files go straight from the browser to the bucket, so the bucket needs a CORS policy naming your site. The app applies it on the first upload after a deploy, using the credentials already in the environment — as long as `APP_URL` is the address you actually browse the site on. If you use a second domain as well, list it in `STORAGE_CORS_ORIGINS`, comma separated.
+
+To check the bucket rather than wait, run these as one-off commands on the service:
 
 ```
-./docker/entrypoint.sh ops storage-cors
+./docker/entrypoint.sh ops storage-check        # do the credentials work at all
+./docker/entrypoint.sh ops storage-cors show    # what the bucket allows, and whether your site is covered
+./docker/entrypoint.sh ops storage-cors         # apply it now instead of on the next upload
 ```
 
-It applies the policy to your own bucket using the credentials already in the environment, defaulting to `APP_URL` as the allowed origin (pass a different origin as an argument if you need one). To confirm the credentials work at all:
-
-```
-./docker/entrypoint.sh ops storage-check
-```
-
-Some providers only accept CORS through their own dashboard; if the command reports that the bucket refused the policy, it prints exactly what to set by hand. See [STORAGE.md](STORAGE.md). See [STORAGE.md](STORAGE.md).
+Some providers only accept CORS through their own dashboard; if the bucket refuses the policy, the command prints exactly what to set by hand. See [STORAGE.md](STORAGE.md).
 
 ## 7. Authentication variables
 

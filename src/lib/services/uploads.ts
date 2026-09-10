@@ -3,6 +3,7 @@ import type { UploadPurpose } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { getSiteSettings } from "@/lib/config/site-settings";
 import { getStorage, buildObjectKey, extensionForMime } from "@/lib/storage";
+import { ensureUploadCorsPolicy, corsAllowsOrigin, uploadOrigins } from "@/lib/storage/cors";
 import { getEnv, missingStorageCredentials } from "@/lib/env";
 import { AppError, NotFoundError } from "@/lib/utils/result";
 
@@ -40,6 +41,22 @@ function extensionMatchesMime(filename: string, mime: string): boolean {
   return (aliases[expected] ?? [expected]).includes(ext);
 }
 
+/**
+ * The allowed origins come from APP_URL. If the site is actually being browsed
+ * somewhere else, the bucket will reject the upload and the browser will report
+ * only a network error, so name the mismatch in the logs while we still can.
+ */
+function warnOnOriginMismatch(requestOrigin?: string | null): void {
+  if (!requestOrigin) return;
+  const allowed = uploadOrigins();
+  if (allowed.length === 0) return;
+  if (corsAllowsOrigin([{ origins: allowed, methods: ["PUT"] }], requestOrigin)) return;
+  console.warn(
+    `[uploads] this request came from ${requestOrigin}, but the bucket only allows uploads from ${allowed.join(", ")}. ` +
+      `Uploads from ${requestOrigin} will be blocked by the browser until APP_URL matches it or it is added to STORAGE_CORS_ORIGINS.`,
+  );
+}
+
 export interface PresignInput {
   workspaceId: string | null;
   userId: string;
@@ -48,6 +65,8 @@ export interface PresignInput {
   mimeType: string;
   sizeBytes: number;
   quoteId?: string | null;
+  /** Origin the browser will PUT from, used to spot an APP_URL mismatch. */
+  requestOrigin?: string | null;
 }
 
 /** Step 1-4 of the upload flow: validate, create a pending record, return a presigned URL. */
@@ -73,6 +92,11 @@ export async function createPresignedUpload(input: PresignInput) {
     console.error(`[uploads] refused: object storage is not configured (missing ${missingStorage.join(", ")}). Set them on the service and redeploy.`);
     throw new AppError("File uploads are not available on this site yet, because its file storage has not been set up. Everything else in the quote still works.", { status: 503, code: "STORAGE_NOT_CONFIGURED" });
   }
+  // The browser PUTs the file to the bucket itself, so the bucket has to allow
+  // it. Done here rather than at boot because it is cheap once cached and this
+  // is the only path that needs it.
+  await ensureUploadCorsPolicy();
+  warnOnOriginMismatch(input.requestOrigin);
   const storage = getStorage();
   const presigned = await storage.createPresignedUpload(key, mime, PRESIGN_TTL_SECONDS);
   const upload = await prisma.upload.create({

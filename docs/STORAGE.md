@@ -33,7 +33,9 @@ with `STORAGE_PROVIDER=railway`, and leave `STORAGE_FORCE_PATH_STYLE` unset: Rai
 
 ## The bucket must allow browser uploads (CORS)
 
-Files go straight from the browser to the bucket with a presigned `PUT`, so the bucket needs a CORS policy naming the site's origin. Without one the browser blocks the request before it leaves, the upload fails with a bare network error, and nothing appears in the bucket's own logs. This is the most common reason uploads fail on a correctly credentialled deployment.
+Files go straight from the browser to the bucket with a presigned `PUT`, so the bucket needs a CORS policy naming the site's origin. Without one the browser blocks the request before it leaves, the upload fails with a bare network error, and nothing appears in the bucket's own logs.
+
+**The application applies this policy itself.** The first time anyone requests an upload after a deploy, it reads the bucket's CORS policy and, if the site's own origin is not already allowed, writes one. Nothing needs to be run by hand. The origins it allows are `APP_URL` plus anything in `STORAGE_CORS_ORIGINS` (comma separated), which is there for a site reachable on more than one domain — a custom domain alongside the `*.up.railway.app` one, for instance. If the bucket refuses to have its policy written, the app logs the refusal and carries on; set the policy in the provider's dashboard instead.
 
 Allow the site origin, the `PUT`, `GET` and `HEAD` methods, and any request headers:
 
@@ -49,12 +51,14 @@ Allow the site origin, the `PUT`, `GET` and `HEAD` methods, and any request head
 ]
 ```
 
-Railway Buckets have no CORS panel in the dashboard, so this must be done through the S3 API. The application can do it for you, using the credentials it already has:
+Railway Buckets have no CORS panel in the dashboard, so it can only be done through the S3 API. To inspect or force it rather than waiting for the next upload:
 
 ```
-./docker/entrypoint.sh ops storage-cors                       # allows APP_URL
+./docker/entrypoint.sh ops storage-cors show                  # what the bucket allows now, and whether this site is covered
+./docker/entrypoint.sh ops storage-cors                       # apply it now for APP_URL + STORAGE_CORS_ORIGINS
 ./docker/entrypoint.sh ops storage-cors https://staging.example.com
 ./docker/entrypoint.sh ops storage-check                      # write, read and delete a test object
+./docker/entrypoint.sh ops doctor                             # includes whether uploads are allowed from this site
 ```
 
 Otherwise set it in the provider's dashboard. On Cloudflare R2 this is the bucket's Settings, CORS policy. On Railway's storage bucket and on AWS S3 it is the bucket CORS configuration. Add every origin the app is served from, including a staging domain if you have one. A wildcard origin works but is worth avoiding on a bucket holding customer photographs.
@@ -176,7 +180,8 @@ The bucket is **not** part of a PostgreSQL dump. Back it up with any S3-compatib
 | Symptom | Likely cause |
 | --- | --- |
 | `STORAGE_PROVIDER=railway requires: ...` at start-up | One of the five bucket variables is not mapped |
-| Presign succeeds but the browser PUT fails with CORS or 403 | Endpoint or credentials wrong, or the presigned URL expired (5 minutes) |
+| Presign succeeds but the browser PUT fails with a network error | The bucket's CORS policy does not cover the origin being browsed. Check `ops storage-cors show`; if the origin listed is not the domain in the address bar, `APP_URL` is wrong or the domain belongs in `STORAGE_CORS_ORIGINS` |
+| Presign succeeds but the browser PUT returns 403 | Endpoint or credentials wrong, or the presigned URL expired (5 minutes) |
 | "The file did not reach storage" on finalise | The PUT never completed; retry the upload |
 | "The uploaded file was larger than expected" | Declared `sizeBytes` did not match the object (tolerance 5 % + 1 KB) |
 | Uploads work locally but previews 404 | `APP_URL` differs from the origin the browser is using; signed local URLs embed `APP_URL` |

@@ -21,3 +21,19 @@ export interface StorageProvider {
   createPresignedDownload(key: string, expiresInSeconds: number, options?: { filename?: string; contentType?: string }): Promise<string>;
   healthCheck(): Promise<{ ok: boolean; message: string }>;
 }
+
+/** A bucket CORS rule, reduced to the parts that decide whether uploads work. */
+export interface CorsRule {
+  origins: string[];
+  methods: string[];
+}
+
+/**
+ * Providers that can read and write their own CORS policy. Only the
+ * S3-compatible provider can; the local and in-memory ones are same-origin, so
+ * there is nothing to configure.
+ */
+export interface CorsCapableStorage {
+  putCorsPolicy(origins: string[]): Promise<void>;
+  getCorsPolicy(): Promise<CorsRule[]>;
+}
